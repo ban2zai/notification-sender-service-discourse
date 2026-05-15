@@ -1,0 +1,46 @@
+# Локальный compose для разработки/проверки этой репы.
+# Для продуктового VPS с существующим /var/tools/docker-compose.yml используй
+# deploy/docker-compose.notification-service.yml как overlay, чтобы не плодить
+# отдельную default-сеть и не отрезать сервис от telegram-bot-api.
+services:
+  notification-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy noeviction
+    volumes:
+      - notification_redis_data:/data
+    networks:
+      - default
+
+  notification-service:
+    build: ./notification-service
+    restart: unless-stopped
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:?set BOT_TOKEN}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?set WEBHOOK_SECRET}
+      SUPABASE_URL: ${SUPABASE_URL:-http://supabase-kong:8000}
+      SUPABASE_KEY: ${SUPABASE_SERVICE_KEY:?set SUPABASE_SERVICE_KEY}
+      REDIS_URL: ${REDIS_URL:-redis://notification-redis:6379}
+      TELEGRAM_API_URL: ${TELEGRAM_API_URL:-http://telegram-bot-api:8081}
+      DISCOURSE_LINKS_TABLE: ${DISCOURSE_LINKS_TABLE:?set DISCOURSE_LINKS_TABLE}
+      DISCOURSE_BASE_URL: ${DISCOURSE_BASE_URL:?set DISCOURSE_BASE_URL}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+    depends_on:
+      - notification-redis
+    networks:
+      - default
+      - supabase_default
+      - proxy_network
+
+volumes:
+  notification_redis_data:
+
+networks:
+  supabase_default:
+    external: true
+  proxy_network:
+    external: true

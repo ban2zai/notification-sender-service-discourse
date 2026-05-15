@@ -1,0 +1,50 @@
+# Overlay для запуска из /var/tools вместе с уже существующим docker-compose.yml.
+# Пример команды на VPS:
+# docker compose \
+#   --env-file .env \
+#   --env-file notification-sender-service-discourse/deploy/.env.notification.test \
+#   -f docker-compose.yml \
+#   -f notification-sender-service-discourse/deploy/docker-compose.notification-service.yml \
+#   up -d --build --no-deps notification-redis notification-service
+
+services:
+  notification-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy noeviction
+    volumes:
+      - notification_redis_data:/data
+    networks:
+      - default
+
+  notification-service:
+    build:
+      context: ./notification-sender-service-discourse/notification-service
+    restart: unless-stopped
+    environment:
+      BOT_TOKEN: ${NOTIFICATION_BOT_TOKEN:?set NOTIFICATION_BOT_TOKEN}
+      WEBHOOK_SECRET: ${NOTIFICATION_WEBHOOK_SECRET:?set NOTIFICATION_WEBHOOK_SECRET}
+      SUPABASE_URL: ${NOTIFICATION_SUPABASE_URL:-http://supabase-kong:8000}
+      SUPABASE_KEY: ${NOTIFICATION_SUPABASE_SERVICE_KEY:?set NOTIFICATION_SUPABASE_SERVICE_KEY}
+      REDIS_URL: redis://notification-redis:6379
+      TELEGRAM_API_URL: ${NOTIFICATION_TELEGRAM_API_URL:-http://telegram-bot-api:8081}
+      DISCOURSE_LINKS_TABLE: ${NOTIFICATION_DISCOURSE_LINKS_TABLE:?set NOTIFICATION_DISCOURSE_LINKS_TABLE}
+      DISCOURSE_BASE_URL: ${NOTIFICATION_DISCOURSE_BASE_URL:?set NOTIFICATION_DISCOURSE_BASE_URL}
+      LOG_LEVEL: ${NOTIFICATION_LOG_LEVEL:-DEBUG}
+      MAX_ATTEMPTS: ${NOTIFICATION_MAX_ATTEMPTS:-5}
+      TELEGRAM_GLOBAL_RATE_PER_SECOND: ${NOTIFICATION_TELEGRAM_GLOBAL_RATE_PER_SECOND:-25}
+      TELEGRAM_CHAT_MIN_INTERVAL_SECONDS: ${NOTIFICATION_TELEGRAM_CHAT_MIN_INTERVAL_SECONDS:-1.05}
+    depends_on:
+      - notification-redis
+      - telegram-bot-api
+    networks:
+      - default
+      - supabase_default
+      - proxy_network
+
+volumes:
+  notification_redis_data:
