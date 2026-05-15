@@ -2,22 +2,20 @@
 
 Python service for delivering Discourse webhook notifications to Telegram through a local Telegram Bot API sidecar.
 
-## Safety Model
+## Repository Hygiene
 
-This repository is safe to publish publicly:
-
-- no real bot tokens, webhook secrets, service role keys, forum domains, or table names are committed;
-- real environment files are ignored by git;
-- test and production values live in separate local env files;
-- the production VPS deployment uses a Compose overlay, so it joins the existing `/var/tools` stack instead of creating an isolated network.
+- Secrets are not committed.
+- Real environment files are ignored by git.
+- Test and production values use separate local env files.
+- VPS deployment uses a Compose overlay for `/var/tools`.
 
 ## Project Layout
 
 - `notification-service/` - Python app: FastAPI ingestion, Redis Stream drain, pending-message reaper.
 - `docker-compose.yml` - local/dev compose for this repo only.
 - `deploy/docker-compose.notification-service.yml` - overlay compose for `/var/tools` on the VPS.
-- `deploy/.env.notification.test.example` - safe template for test forum settings.
-- `deploy/.env.notification.prod.example` - safe template for production forum settings.
+- `deploy/.env.notification.test.example` - test env template.
+- `deploy/.env.notification.prod.example` - production env template.
 
 ## Recommended VPS Deployment
 
@@ -71,7 +69,7 @@ docker compose \
   up -d --build --no-deps notification-redis notification-service
 ```
 
-Do not run a blind `docker compose up -d` for the full stack while testing. Чувак, вот это как раз тот случай, где можно случайно тронуть полсервака.
+Run only `notification-redis` and `notification-service` during rollout.
 
 ## Test vs Production
 
@@ -95,7 +93,7 @@ Then replace the second `--env-file` in the compose commands with:
 
 - `notification-redis` is separate from other services and stores only this service queue.
 - `notification-service` has no published host ports by default.
-- Nginx Proxy Manager should reach it through `proxy_network` by service name `notification-service` and port `18080`.
+- Nginx Proxy Manager should reach it through `proxy_network` by service name `notification-service` and port `8067`.
 - The service reaches Telegram via `telegram-bot-api:8081` on the existing `/var/tools` default network.
 - The service reaches Supabase via `supabase-kong:8000` on `supabase_default`.
 

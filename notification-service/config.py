@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     discourse_base_url: str = Field(validation_alias="DISCOURSE_BASE_URL")
 
     host: str = Field(default="0.0.0.0", validation_alias="HOST")
-    port: int = Field(default=18080, validation_alias="PORT")
+    port: int = Field(default=8067, validation_alias="PORT")
     log_level: str = Field(default="DEBUG", validation_alias="LOG_LEVEL")
 
     redis_stream: str = Field(default="tg_notifications", validation_alias="REDIS_STREAM")
