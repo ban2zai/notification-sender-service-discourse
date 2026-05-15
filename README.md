@@ -95,7 +95,7 @@ Then replace the second `--env-file` in the compose commands with:
 
 - `notification-redis` is separate from other services and stores only this service queue.
 - `notification-service` has no published host ports by default.
-- Nginx Proxy Manager should reach it through `proxy_network` by service name `notification-service` and port `8000`.
+- Nginx Proxy Manager should reach it through `proxy_network` by service name `notification-service` and port `18080`.
 - The service reaches Telegram via `telegram-bot-api:8081` on the existing `/var/tools` default network.
 - The service reaches Supabase via `supabase-kong:8000` on `supabase_default`.
 
@@ -124,4 +124,3 @@ On the VPS, use the merged compose validation command from the deployment sectio
 - Deduplication is atomic Redis Lua: `SET NX EX` + `XADD`.
 - `XACK` happens only after Telegram accepts the message or after the retry limit is exhausted.
 - Dead letters are JSON logs in stdout for Promtail/Loki, not DB rows.
-

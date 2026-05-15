@@ -28,6 +28,7 @@ services:
       TELEGRAM_API_URL: ${TELEGRAM_API_URL:-http://telegram-bot-api:8081}
       DISCOURSE_LINKS_TABLE: ${DISCOURSE_LINKS_TABLE:?set DISCOURSE_LINKS_TABLE}
       DISCOURSE_BASE_URL: ${DISCOURSE_BASE_URL:?set DISCOURSE_BASE_URL}
+      PORT: ${PORT:-18080}
       LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
     depends_on:
       - notification-redis
