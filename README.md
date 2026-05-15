@@ -96,6 +96,7 @@ Then replace the second `--env-file` in the compose commands with:
 - Nginx Proxy Manager should reach it through `proxy_network` by service name `notification-service` and port `8067`.
 - The service reaches Telegram via `telegram-bot-api:8081` on the existing `/var/tools` default network.
 - The service reaches Supabase via `supabase-kong:8000` on `supabase_default`.
+- Set `NOTIFICATION_LOG_PAYLOAD_DATA=true` to log `notification.data` during template debugging.
 
 ## Checks
 

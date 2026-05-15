@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     host: str = Field(default="0.0.0.0", validation_alias="HOST")
     port: int = Field(default=8067, validation_alias="PORT")
     log_level: str = Field(default="DEBUG", validation_alias="LOG_LEVEL")
+    log_notification_data: bool = Field(default=False, validation_alias="NOTIFICATION_LOG_PAYLOAD_DATA")
 
     redis_stream: str = Field(default="tg_notifications", validation_alias="REDIS_STREAM")
     redis_group: str = Field(default="drain", validation_alias="REDIS_GROUP")

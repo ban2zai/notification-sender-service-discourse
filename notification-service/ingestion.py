@@ -75,6 +75,7 @@ def create_app(
                 "user_id": notification.get("user_id"),
                 "topic_id": notification.get("topic_id"),
                 "post_number": notification.get("post_number"),
+                **_notification_debug_fields(notification, settings),
             },
         )
 
@@ -104,6 +105,7 @@ async def _handle_notification(
             extra={
                 "event": "notification_skipped",
                 "notification_type": notification.get("notification_type"),
+                **_notification_debug_fields(notification, settings),
             },
         )
         return
@@ -210,3 +212,14 @@ def _decode_redis_value(value: Any) -> str:
     if isinstance(value, bytes):
         return value.decode()
     return str(value)
+
+
+def _notification_debug_fields(notification: dict[str, Any], settings: Settings) -> dict[str, Any]:
+    if not settings.log_notification_data:
+        return {}
+
+    data = notification.get("data") or {}
+    return {
+        "data_keys": sorted(data.keys()),
+        "notification_data": data,
+    }

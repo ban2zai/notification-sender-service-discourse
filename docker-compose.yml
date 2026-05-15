@@ -30,6 +30,7 @@ services:
       DISCOURSE_BASE_URL: ${DISCOURSE_BASE_URL:?set DISCOURSE_BASE_URL}
       PORT: ${PORT:-8067}
       LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      NOTIFICATION_LOG_PAYLOAD_DATA: ${NOTIFICATION_LOG_PAYLOAD_DATA:-false}
     depends_on:
       - notification-redis
     networks:

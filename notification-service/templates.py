@@ -23,6 +23,10 @@ NOTIFICATION_MAP = {
         "enabled": True,
         "template": '🆕 Новая тема по твоему тегу: *"{title}"*\n{url}',
     },
+    36: {
+        "enabled": True,
+        "template": '🆕 Новая тема или пост в отслеживаемом разделе/теге: *"{title}"*\n{url}',
+    },
 }
 
 NO_POST_URL_TYPES = {6, 17}
@@ -77,4 +81,3 @@ def build_idempotency_key(notification: dict) -> str:
         post_num=notification.get("post_number", ""),
         user_id=notification.get("user_id", ""),
     )
-

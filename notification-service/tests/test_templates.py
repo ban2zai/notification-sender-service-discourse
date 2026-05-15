@@ -35,6 +35,21 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("u\\*ser", message)
         self.assertIn("A\\_B", message)
 
+    def test_render_watching_category_or_tag_message(self):
+        message, url = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 36,
+                "user_id": 123,
+                "topic_id": 456,
+                "post_number": 1,
+                "data": {"topic_title": "Новая тема", "original_username": "user"},
+            },
+        )
+
+        self.assertEqual(url, "https://forum.example.ru/t/456/1")
+        self.assertIn("отслеживаемом разделе/теге", message)
+
     def test_idempotency_key_shape(self):
         self.assertEqual(
             build_idempotency_key(
@@ -46,4 +61,3 @@ class TemplateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

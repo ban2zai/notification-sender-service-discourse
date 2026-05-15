@@ -5,7 +5,7 @@ from logging_config import _redact
 
 class LoggingConfigTests(unittest.TestCase):
     def test_redacts_telegram_bot_token_in_url(self):
-        value = "POST http://telegram-bot-api:8081/bot8774568342:AAHeyLuQDTtDUV-q4N_WCmi1pNnI7_O48KA/sendMessage"
+        value = "POST http://telegram-bot-api:8081/bot123456:TEST_TOKEN_VALUE_WITH_SAFE_PLACEHOLDER/sendMessage"
 
         self.assertEqual(
             _redact(value),
@@ -20,4 +20,3 @@ class LoggingConfigTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
