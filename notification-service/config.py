@@ -54,10 +54,23 @@ class Settings(BaseSettings):
         validation_alias="DISCOURSE_CATEGORIES_CACHE_TTL_SECONDS",
     )
     telegram_excerpt_max_chars: int = Field(default=400, validation_alias="TELEGRAM_EXCERPT_MAX_CHARS")
-    telegram_global_rate_per_second: float = Field(default=25.0, validation_alias="TELEGRAM_GLOBAL_RATE_PER_SECOND")
+    telegram_global_rate_per_second: float = Field(default=50.0, validation_alias="TELEGRAM_GLOBAL_RATE_PER_SECOND")
     telegram_chat_min_interval_seconds: float = Field(
         default=1.05,
         validation_alias="TELEGRAM_CHAT_MIN_INTERVAL_SECONDS",
+    )
+    supabase_links_cache_enabled: bool = Field(default=True, validation_alias="SUPABASE_LINKS_CACHE_ENABLED")
+    supabase_links_cache_refresh_seconds: int = Field(
+        default=60,
+        validation_alias="SUPABASE_LINKS_CACHE_REFRESH_SECONDS",
+    )
+    supabase_links_cache_stale_seconds: int = Field(
+        default=1800,
+        validation_alias="SUPABASE_LINKS_CACHE_STALE_SECONDS",
+    )
+    supabase_links_direct_lookup_on_miss: bool = Field(
+        default=True,
+        validation_alias="SUPABASE_LINKS_DIRECT_LOOKUP_ON_MISS",
     )
 
     @field_validator("supabase_url", "telegram_api_url", "discourse_base_url")

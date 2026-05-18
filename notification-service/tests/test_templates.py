@@ -68,11 +68,11 @@ class TemplateTests(unittest.TestCase):
 
         self.assertEqual(url, "https://forum.example.ru/t/456/1")
         self.assertIn("Новая тема", message)
-        self.assertIn('<b><a href="https://forum.example.ru/t/456/1">A &amp; B</a></b>', message)
+        self.assertIn("<b>A &amp; B</b>", message)
         self.assertIn("<b>Обсуждения</b>", message)
         self.assertIn("ЗГУ, Программирование-БГУ", message)
         self.assertIn("<pre>Текст первого поста</pre>", message)
-        self.assertNotIn("\nhttps://forum.example.ru/t/456/1", message)
+        self.assertIn("\nhttps://forum.example.ru/t/456/1", message)
 
     def test_render_private_message_without_excerpt(self):
         message, _ = render_notification_message(
@@ -106,8 +106,7 @@ class TemplateTests(unittest.TestCase):
 
         self.assertEqual(url, "https://forum.example.ru/t/456/1")
         self.assertIn("Fallback", message)
-        self.assertIn('href="https://forum.example.ru/t/456/1"', message)
-        self.assertNotIn("\nhttps://forum.example.ru/t/456/1", message)
+        self.assertIn("\nhttps://forum.example.ru/t/456/1", message)
 
     def test_excerpt_cleanup_and_truncation(self):
         self.assertEqual(build_excerpt({"raw": "a\n\n b\tc"}, 100), "a b c")

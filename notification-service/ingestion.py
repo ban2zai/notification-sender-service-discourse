@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from config import Settings
 from events import build_idempotency_key, classify_event
+from link_cache import TelegramLinkCache
 from security import is_valid_discourse_signature
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ def create_app(
     redis_client: aioredis.Redis,
     http_client: httpx.AsyncClient,
     settings: Settings,
+    link_cache: TelegramLinkCache,
 ) -> FastAPI:
     app = FastAPI(title="Discourse Telegram notification service")
 
@@ -84,7 +86,7 @@ def create_app(
         )
 
         try:
-            await _handle_notification(notification, redis_client, http_client, settings)
+            await _handle_notification(notification, redis_client, settings, link_cache)
         except Exception as exc:
             logger.exception(
                 "Webhook processing failed after signature validation",
@@ -99,8 +101,8 @@ def create_app(
 async def _handle_notification(
     notification: dict[str, Any],
     redis_client: aioredis.Redis,
-    http_client: httpx.AsyncClient,
     settings: Settings,
+    link_cache: TelegramLinkCache,
 ) -> None:
     event_kind = classify_event(notification)
     if not event_kind:
@@ -118,8 +120,16 @@ async def _handle_notification(
     if user_id is None:
         logger.warning("Notification has no user_id", extra={"event": "notification_missing_user_id"})
         return
+    try:
+        user_id_int = int(user_id)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Notification has invalid user_id",
+            extra={"event": "notification_invalid_user_id", "user_id": user_id},
+        )
+        return
 
-    chat_id = await _lookup_chat_id(http_client, settings, user_id)
+    chat_id = await link_cache.lookup(user_id_int)
     if chat_id is None:
         logger.debug("No active Telegram link found", extra={"event": "lookup_miss", "user_id": user_id})
         return
@@ -173,47 +183,6 @@ async def _handle_notification(
             "event_kind": event_kind,
         },
     )
-
-
-async def _lookup_chat_id(http_client: httpx.AsyncClient, settings: Settings, user_id: int) -> int | None:
-    url = f"{settings.supabase_url}/rest/v1/{settings.discourse_links_table}"
-    headers = {
-        "apikey": settings.supabase_key,
-        "Authorization": f"Bearer {settings.supabase_key}",
-    }
-    params = {
-        "discourse_user_id": f"eq.{user_id}",
-        "is_active": "eq.true",
-        "select": "chat_id",
-        "limit": "1",
-    }
-
-    try:
-        response = await http_client.get(
-            url,
-            headers=headers,
-            params=params,
-            timeout=settings.supabase_timeout_seconds,
-        )
-        response.raise_for_status()
-        data = response.json()
-    except Exception as exc:
-        logger.warning("Supabase lookup failed", extra={"event": "lookup_failed", "user_id": user_id, "error": str(exc)})
-        return None
-
-    if not data:
-        return None
-
-    chat_id = data[0].get("chat_id")
-    try:
-        return int(chat_id)
-    except (TypeError, ValueError):
-        logger.warning(
-            "Supabase returned invalid chat_id",
-            extra={"event": "lookup_invalid_chat_id", "user_id": user_id, "chat_id": chat_id},
-        )
-        return None
-
 
 def _decode_redis_value(value: Any) -> str:
     if isinstance(value, bytes):

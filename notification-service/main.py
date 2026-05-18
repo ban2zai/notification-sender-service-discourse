@@ -9,6 +9,7 @@ import uvicorn
 from config import get_settings
 from drain import drain_loop
 from ingestion import create_app
+from link_cache import TelegramLinkCache
 from logging_config import configure_logging
 from reaper import reaper_loop
 from telegram import TelegramRateLimiter
@@ -25,12 +26,13 @@ async def main() -> None:
 
     redis_client = aioredis.from_url(settings.redis_url, decode_responses=False)
     http_client = httpx.AsyncClient()
+    link_cache = TelegramLinkCache(http_client, settings)
     rate_limiter = TelegramRateLimiter(
         global_rate_per_second=settings.telegram_global_rate_per_second,
         chat_min_interval_seconds=settings.telegram_chat_min_interval_seconds,
     )
 
-    app = create_app(redis_client=redis_client, http_client=http_client, settings=settings)
+    app = create_app(redis_client=redis_client, http_client=http_client, settings=settings, link_cache=link_cache)
     server = uvicorn.Server(
         uvicorn.Config(
             app,
@@ -50,10 +52,14 @@ async def main() -> None:
         reaper_loop(redis_client, http_client, settings, rate_limiter, stop_event),
         name="reaper",
     )
+    links_cache_task = asyncio.create_task(
+        link_cache.refresh_loop(stop_event),
+        name="links-cache",
+    )
 
     try:
         await asyncio.wait(
-            {server_task, drain_task, reaper_task},
+            {server_task, drain_task, reaper_task, links_cache_task},
             return_when=asyncio.FIRST_COMPLETED,
         )
     finally:
@@ -61,7 +67,7 @@ async def main() -> None:
         stop_event.set()
         server.should_exit = True
 
-        await asyncio.gather(server_task, drain_task, reaper_task, return_exceptions=True)
+        await asyncio.gather(server_task, drain_task, reaper_task, links_cache_task, return_exceptions=True)
         await http_client.aclose()
         await redis_client.aclose()
         logger.info("Shutdown complete", extra={"event": "shutdown_complete"})
