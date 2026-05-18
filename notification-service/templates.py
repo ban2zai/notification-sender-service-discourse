@@ -40,35 +40,34 @@ def render_notification_message(
     tags = _format_tags(topic.get("tags") or [])
     excerpt = _html(build_excerpt(post, excerpt_max_chars)) if event_kind != "private_message" else ""
     safe_url = _html(url)
+    linked_title = _linked_title(title, safe_url)
 
     if event_kind == "new_topic":
         return _with_optional_excerpt(
-            f'Новая тема: <b>{title}</b>\n'
+            f"Новая тема: {linked_title}\n"
             f"Категория: <b>{category}</b>\n"
             f"Теги: <b>{tags}</b>",
             excerpt,
-            safe_url,
         ), url
 
     if event_kind == "new_post":
         return _with_optional_excerpt(
-            f'Новый пост в теме: <b>{title}</b>\n'
+            f"Новый пост в теме: {linked_title}\n"
             f"Категория: <b>{category}</b>\n"
             f"Теги: <b>{tags}</b>",
             excerpt,
-            safe_url,
         ), url
 
     headers = {
-        "mention": f'<b>{username}</b> упомянул тебя в теме <b>{title}</b>',
-        "reply": f'<b>{username}</b> ответил на твой пост в теме <b>{title}</b>',
-        "quote": f'<b>{username}</b> процитировал тебя в теме <b>{title}</b>',
-        "edit": f'<b>{username}</b> отредактировал пост в теме <b>{title}</b>',
-        "private_message": f'<b>{username}</b> написал личное сообщение: <b>{title}</b>',
-        "group_mention": f'<b>{username}</b> упомянул группу в теме <b>{title}</b>',
+        "mention": f"<b>{username}</b> упомянул тебя в теме {linked_title}",
+        "reply": f"<b>{username}</b> ответил на твой пост в теме {linked_title}",
+        "quote": f"<b>{username}</b> процитировал тебя в теме {linked_title}",
+        "edit": f"<b>{username}</b> отредактировал пост в теме {linked_title}",
+        "private_message": f"<b>{username}</b> написал личное сообщение: {linked_title}",
+        "group_mention": f"<b>{username}</b> упомянул группу в теме {linked_title}",
     }
-    header = headers.get(event_kind, f'Уведомление в теме <b>{title}</b>')
-    return _with_optional_excerpt(header, excerpt, safe_url), url
+    header = headers.get(event_kind, f"Уведомление в теме {linked_title}")
+    return _with_optional_excerpt(header, excerpt), url
 
 
 def render_fallback_message(base_url: str, notification: dict[str, Any], event_kind: str) -> tuple[str, str]:
@@ -91,13 +90,13 @@ def render_fallback_message(base_url: str, notification: dict[str, Any], event_k
         "private_message": "Личное сообщение",
         "group_mention": "Упоминание группы",
     }.get(event_kind, "Уведомление")
-    return f"{label}: <b>{title}</b>\n{_html(url)}", url
+    return f"{label}: {_linked_title(title, _html(url))}", url
 
 
-def _with_optional_excerpt(header: str, excerpt: str, url: str) -> str:
+def _with_optional_excerpt(header: str, excerpt: str) -> str:
     if excerpt:
-        return f"{header}\n\n<pre>{excerpt}</pre>\n{url}"
-    return f"{header}\n{url}"
+        return f"{header}\n\n<pre>{excerpt}</pre>"
+    return header
 
 
 def _format_tags(tags: list[Any]) -> str:
@@ -118,3 +117,7 @@ def _format_tags(tags: list[Any]) -> str:
 
 def _html(value: object) -> str:
     return escape(str(value or ""), quote=False)
+
+
+def _linked_title(title: str, url: str) -> str:
+    return f'<b><a href="{url}">{title}</a></b>'
