@@ -53,7 +53,13 @@ class TemplateTests(unittest.TestCase):
             },
             "new_topic",
             {
-                "topic": {"title": "A & B", "tags": ["ЗГУ", "1C"]},
+                "topic": {
+                    "title": "A & B",
+                    "tags": [
+                        {"id": 1, "name": "ЗГУ", "slug": "zgu"},
+                        {"id": 2, "name": "Программирование-БГУ", "slug": "programmirovanie-bgu"},
+                    ],
+                },
                 "post": {"raw": "Текст первого поста"},
                 "category": "Обсуждения",
             },
@@ -64,7 +70,7 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("Новая тема", message)
         self.assertIn("A &amp; B", message)
         self.assertIn("<b>Обсуждения</b>", message)
-        self.assertIn("#ЗГУ, #1C", message)
+        self.assertIn("ЗГУ, Программирование-БГУ", message)
         self.assertIn("<pre>Текст первого поста</pre>", message)
 
     def test_render_private_message_without_excerpt(self):
@@ -107,4 +113,3 @@ class TemplateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

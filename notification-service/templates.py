@@ -103,7 +103,17 @@ def _with_optional_excerpt(header: str, excerpt: str, url: str) -> str:
 def _format_tags(tags: list[Any]) -> str:
     if not tags:
         return "нет"
-    return ", ".join(f"#{_html(str(tag))}" for tag in tags)
+
+    labels = []
+    for tag in tags:
+        if isinstance(tag, dict):
+            label = tag.get("name") or tag.get("slug") or ""
+        else:
+            label = str(tag or "")
+        if label:
+            labels.append(_html(label))
+
+    return ", ".join(labels) if labels else "нет"
 
 
 def _html(value: object) -> str:
