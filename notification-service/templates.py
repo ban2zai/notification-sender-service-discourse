@@ -1,45 +1,10 @@
-NOTIFICATION_MAP = {
-    1: {
-        "enabled": True,
-        "template": '👤 *{username}* упомянул тебя в теме *"{title}"*\n{url}',
-    },
-    2: {
-        "enabled": True,
-        "template": '💬 *{username}* ответил на твой пост в теме *"{title}"*\n{url}',
-    },
-    4: {
-        "enabled": True,
-        "template": '✏️ *{username}* отредактировал пост в теме *"{title}"*\n{url}',
-    },
-    6: {
-        "enabled": True,
-        "template": '✉️ *{username}* написал личное сообщение: *"{title}"*\n{url}',
-    },
-    9: {
-        "enabled": True,
-        "template": '📌 Новый пост в теме *"{title}"*\n{url}',
-    },
-    17: {
-        "enabled": True,
-        "template": '🆕 Новая тема по твоему тегу: *"{title}"*\n{url}',
-    },
-    36: {
-        "enabled": True,
-        "template": '🆕 Новая тема или пост в отслеживаемом разделе/теге: *"{title}"*\n{url}',
-    },
-}
+from html import escape
+from typing import Any
+
+from discourse import build_excerpt
+
 
 NO_POST_URL_TYPES = {6, 17}
-
-
-def escape_md(text: str) -> str:
-    return (
-        str(text or "")
-        .replace("*", "\\*")
-        .replace("_", "\\_")
-        .replace("`", "\\`")
-        .replace("[", "\\[")
-    )
 
 
 def build_topic_url(base_url: str, notification_type: int, topic_id: object, post_number: object) -> str:
@@ -49,35 +14,97 @@ def build_topic_url(base_url: str, notification_type: int, topic_id: object, pos
     return f"{base_topic_url}/{post_number or ''}"
 
 
-def render_notification_message(base_url: str, notification: dict) -> tuple[str | None, str | None]:
-    notification_type = notification.get("notification_type")
-    template_config = NOTIFICATION_MAP.get(notification_type)
-    if not template_config or not template_config.get("enabled"):
-        return None, None
-
+def render_notification_message(
+    base_url: str,
+    notification: dict[str, Any],
+    event_kind: str,
+    enriched: dict[str, Any] | None,
+    excerpt_max_chars: int,
+) -> tuple[str, str]:
+    enriched = enriched or {}
     data = notification.get("data") or {}
+    topic = enriched.get("topic") or {}
+    post = enriched.get("post") or {}
+
+    notification_type = int(notification.get("notification_type") or 0)
     url = build_topic_url(
         base_url=base_url,
         notification_type=notification_type,
         topic_id=notification.get("topic_id", ""),
         post_number=notification.get("post_number", ""),
     )
-    username = escape_md(data.get("original_username", "кто-то"))
-    title = escape_md(data.get("topic_title", "тема"))
 
-    return (
-        template_config["template"]
-        .replace("{username}", username)
-        .replace("{title}", title)
-        .replace("{url}", url),
-        url,
-    )
+    title = _html(topic.get("title") or data.get("topic_title") or notification.get("fancy_title") or "тема")
+    username = _html(data.get("display_username") or data.get("original_username") or "кто-то")
+    category = _html(enriched.get("category") or "не указана")
+    tags = _format_tags(topic.get("tags") or [])
+    excerpt = _html(build_excerpt(post, excerpt_max_chars)) if event_kind != "private_message" else ""
+    safe_url = _html(url)
+
+    if event_kind == "new_topic":
+        return _with_optional_excerpt(
+            f'Новая тема: <b>{title}</b>\n'
+            f"Категория: <b>{category}</b>\n"
+            f"Теги: <b>{tags}</b>",
+            excerpt,
+            safe_url,
+        ), url
+
+    if event_kind == "new_post":
+        return _with_optional_excerpt(
+            f'Новый пост в теме: <b>{title}</b>\n'
+            f"Категория: <b>{category}</b>\n"
+            f"Теги: <b>{tags}</b>",
+            excerpt,
+            safe_url,
+        ), url
+
+    headers = {
+        "mention": f'<b>{username}</b> упомянул тебя в теме <b>{title}</b>',
+        "reply": f'<b>{username}</b> ответил на твой пост в теме <b>{title}</b>',
+        "quote": f'<b>{username}</b> процитировал тебя в теме <b>{title}</b>',
+        "edit": f'<b>{username}</b> отредактировал пост в теме <b>{title}</b>',
+        "private_message": f'<b>{username}</b> написал личное сообщение: <b>{title}</b>',
+        "group_mention": f'<b>{username}</b> упомянул группу в теме <b>{title}</b>',
+    }
+    header = headers.get(event_kind, f'Уведомление в теме <b>{title}</b>')
+    return _with_optional_excerpt(header, excerpt, safe_url), url
 
 
-def build_idempotency_key(notification: dict) -> str:
-    return "{notif_type}_{topic_id}_{post_num}_{user_id}".format(
-        notif_type=notification.get("notification_type", ""),
+def render_fallback_message(base_url: str, notification: dict[str, Any], event_kind: str) -> tuple[str, str]:
+    data = notification.get("data") or {}
+    notification_type = int(notification.get("notification_type") or 0)
+    url = build_topic_url(
+        base_url=base_url,
+        notification_type=notification_type,
         topic_id=notification.get("topic_id", ""),
-        post_num=notification.get("post_number", ""),
-        user_id=notification.get("user_id", ""),
+        post_number=notification.get("post_number", ""),
     )
+    title = _html(data.get("topic_title") or notification.get("fancy_title") or "тема")
+    label = {
+        "new_topic": "Новая тема",
+        "new_post": "Новый пост",
+        "mention": "Упоминание",
+        "reply": "Ответ",
+        "quote": "Цитата",
+        "edit": "Редактирование",
+        "private_message": "Личное сообщение",
+        "group_mention": "Упоминание группы",
+    }.get(event_kind, "Уведомление")
+    return f"{label}: <b>{title}</b>\n{_html(url)}", url
+
+
+def _with_optional_excerpt(header: str, excerpt: str, url: str) -> str:
+    if excerpt:
+        return f"{header}\n\n<pre>{excerpt}</pre>\n{url}"
+    return f"{header}\n{url}"
+
+
+def _format_tags(tags: list[Any]) -> str:
+    if not tags:
+        return "нет"
+    return ", ".join(f"#{_html(str(tag))}" for tag in tags)
+
+
+def _html(value: object) -> str:
+    return escape(str(value or ""), quote=False)

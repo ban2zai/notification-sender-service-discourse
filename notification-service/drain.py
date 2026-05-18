@@ -1,14 +1,27 @@
+from __future__ import annotations
+
 import asyncio
+import json
 import logging
 from contextlib import suppress
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
-import redis.asyncio as aioredis
-from redis.exceptions import ResponseError
+try:
+    import redis.asyncio as aioredis
+    from redis.exceptions import ResponseError
+except ModuleNotFoundError:
+    aioredis = None
 
-from config import Settings
+    class ResponseError(Exception):
+        pass
+
+from discourse import enrich_notification
+from templates import render_fallback_message, render_notification_message
 from telegram import TelegramRateLimiter, send_telegram_message
+
+if TYPE_CHECKING:
+    from config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -106,9 +119,11 @@ async def _process_one(
     decoded_message_id = _decode(message_id)
     chat_id = _to_int(fields.get(b"chat_id") or fields.get("chat_id"))
     text = _decode(fields.get(b"message_text") or fields.get("message_text"))
+    event_kind = _decode(fields.get(b"event_kind") or fields.get("event_kind"))
+    notification_json = _decode(fields.get(b"notification_json") or fields.get("notification_json"))
     idempotency_key = _decode(fields.get(b"idempotency_key") or fields.get("idempotency_key"))
 
-    if chat_id is None or not text:
+    if chat_id is None or (not text and not notification_json):
         logger.warning(
             "Invalid stream message, acking",
             extra={"event": "invalid_stream_message", "message_id": decoded_message_id},
@@ -133,6 +148,35 @@ async def _process_one(
         )
         await redis_client.xack(settings.redis_stream, settings.redis_group, message_id)
         return
+
+    if not text:
+        try:
+            notification = json.loads(notification_json)
+        except json.JSONDecodeError as exc:
+            logger.warning(
+                "Invalid notification JSON, acking",
+                extra={"event": "invalid_notification_json", "message_id": decoded_message_id, "error": str(exc)},
+            )
+            await redis_client.xack(settings.redis_stream, settings.redis_group, message_id)
+            return
+
+        enriched, enrichment_failed = await enrich_notification(redis_client, http_client, settings, notification)
+        if enrichment_failed:
+            logger.warning(
+                "Discourse enrichment failed, using fallback",
+                extra={"event": "enrichment_failed", "message_id": decoded_message_id, "idempotency_key": idempotency_key},
+            )
+
+        if enrichment_failed and not enriched.get("topic") and not enriched.get("post"):
+            text, _ = render_fallback_message(settings.discourse_base_url, notification, event_kind)
+        else:
+            text, _ = render_notification_message(
+                settings.discourse_base_url,
+                notification,
+                event_kind,
+                enriched,
+                settings.telegram_excerpt_max_chars,
+            )
 
     await limiter.wait(chat_id)
     ok, retry_after, error = await send_telegram_message(http_client, settings, chat_id, text)

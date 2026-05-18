@@ -1,12 +1,34 @@
 import unittest
 
-from templates import build_idempotency_key, build_topic_url, escape_md, render_notification_message
+from discourse import build_excerpt
+from events import build_idempotency_key, classify_event
+from templates import build_topic_url, render_fallback_message, render_notification_message
+
+
+class EventTests(unittest.TestCase):
+    def test_classifies_new_topic_for_9_17_36(self):
+        for notification_type in (9, 17, 36):
+            self.assertEqual(
+                classify_event({"notification_type": notification_type, "post_number": 1}),
+                "new_topic",
+            )
+
+    def test_classifies_new_post(self):
+        self.assertEqual(classify_event({"notification_type": 36, "post_number": 3}), "new_post")
+
+    def test_new_topic_idempotency_dedupes_notification_types(self):
+        keys = {
+            build_idempotency_key(
+                {"notification_type": notification_type, "topic_id": 456, "post_number": 1, "user_id": 123},
+                "new_topic",
+            )
+            for notification_type in (9, 17, 36)
+        }
+
+        self.assertEqual(keys, {"new_topic:456:123"})
 
 
 class TemplateTests(unittest.TestCase):
-    def test_escape_markdown_v1_specials(self):
-        self.assertEqual(escape_md("a*b_c`d[e"), "a\\*b\\_c\\`d\\[e")
-
     def test_post_url_contains_post_number_for_regular_notifications(self):
         self.assertEqual(
             build_topic_url("https://forum.example.ru", 2, 456, 7),
@@ -19,23 +41,7 @@ class TemplateTests(unittest.TestCase):
             "https://forum.example.ru/t/456",
         )
 
-    def test_render_notification_message(self):
-        message, url = render_notification_message(
-            "https://forum.example.ru",
-            {
-                "notification_type": 2,
-                "user_id": 123,
-                "topic_id": 456,
-                "post_number": 7,
-                "data": {"topic_title": "A_B", "original_username": "u*ser"},
-            },
-        )
-
-        self.assertEqual(url, "https://forum.example.ru/t/456/7")
-        self.assertIn("u\\*ser", message)
-        self.assertIn("A\\_B", message)
-
-    def test_render_watching_category_or_tag_message(self):
+    def test_render_new_topic_message_with_enrichment(self):
         message, url = render_notification_message(
             "https://forum.example.ru",
             {
@@ -43,21 +49,62 @@ class TemplateTests(unittest.TestCase):
                 "user_id": 123,
                 "topic_id": 456,
                 "post_number": 1,
-                "data": {"topic_title": "Новая тема", "original_username": "user"},
+                "data": {"topic_title": "A & B", "original_username": "user"},
             },
+            "new_topic",
+            {
+                "topic": {"title": "A & B", "tags": ["ЗГУ", "1C"]},
+                "post": {"raw": "Текст первого поста"},
+                "category": "Обсуждения",
+            },
+            400,
         )
 
         self.assertEqual(url, "https://forum.example.ru/t/456/1")
-        self.assertIn("отслеживаемом разделе/теге", message)
+        self.assertIn("Новая тема", message)
+        self.assertIn("A &amp; B", message)
+        self.assertIn("<b>Обсуждения</b>", message)
+        self.assertIn("#ЗГУ, #1C", message)
+        self.assertIn("<pre>Текст первого поста</pre>", message)
 
-    def test_idempotency_key_shape(self):
-        self.assertEqual(
-            build_idempotency_key(
-                {"notification_type": 2, "topic_id": 456, "post_number": 7, "user_id": 123}
-            ),
-            "2_456_7_123",
+    def test_render_private_message_without_excerpt(self):
+        message, _ = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 6,
+                "user_id": 123,
+                "topic_id": 456,
+                "post_number": 1,
+                "data": {"topic_title": "PM", "original_username": "user"},
+            },
+            "private_message",
+            {"topic": {"title": "PM"}, "post": {"raw": "secret"}, "category": ""},
+            400,
         )
+
+        self.assertNotIn("<pre>", message)
+        self.assertNotIn("secret", message)
+
+    def test_render_fallback_message(self):
+        message, url = render_fallback_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 36,
+                "topic_id": 456,
+                "post_number": 1,
+                "data": {"topic_title": "Fallback"},
+            },
+            "new_topic",
+        )
+
+        self.assertEqual(url, "https://forum.example.ru/t/456/1")
+        self.assertIn("Fallback", message)
+
+    def test_excerpt_cleanup_and_truncation(self):
+        self.assertEqual(build_excerpt({"raw": "a\n\n b\tc"}, 100), "a b c")
+        self.assertEqual(build_excerpt({"raw": "123456789"}, 6), "12345…")
 
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -8,8 +8,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from config import Settings
+from events import build_idempotency_key, classify_event
 from security import is_valid_discourse_signature
-from templates import build_idempotency_key, render_notification_message
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +28,14 @@ local message_id = redis.call(
     "*",
     "chat_id",
     ARGV[3],
-    "message_text",
+    "event_kind",
     ARGV[4],
+    "notification_type",
+    ARGV[5],
     "idempotency_key",
-    ARGV[5]
+    ARGV[6],
+    "notification_json",
+    ARGV[7]
 )
 return {1, message_id}
 """
@@ -98,8 +102,8 @@ async def _handle_notification(
     http_client: httpx.AsyncClient,
     settings: Settings,
 ) -> None:
-    message_text, url = render_notification_message(settings.discourse_base_url, notification)
-    if not message_text:
+    event_kind = classify_event(notification)
+    if not event_kind:
         logger.debug(
             "Notification type skipped",
             extra={
@@ -120,8 +124,9 @@ async def _handle_notification(
         logger.debug("No active Telegram link found", extra={"event": "lookup_miss", "user_id": user_id})
         return
 
-    idempotency_key = build_idempotency_key(notification)
+    idempotency_key = build_idempotency_key(notification, event_kind)
     redis_key = f"idem:{idempotency_key}"
+    notification_json = json.dumps(notification, ensure_ascii=False, separators=(",", ":"))
 
     try:
         added, message_id = await redis_client.eval(
@@ -132,8 +137,10 @@ async def _handle_notification(
             str(settings.idempotency_ttl_seconds),
             str(settings.stream_maxlen),
             str(chat_id),
-            message_text,
+            event_kind,
+            str(notification.get("notification_type", "")),
             idempotency_key,
+            notification_json,
         )
     except Exception as exc:
         logger.exception(
@@ -163,7 +170,7 @@ async def _handle_notification(
             "user_id": user_id,
             "chat_id": chat_id,
             "idempotency_key": idempotency_key,
-            "url": url,
+            "event_kind": event_kind,
         },
     )
 

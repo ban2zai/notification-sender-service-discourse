@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import httpx
 
-from config import Settings
+if TYPE_CHECKING:
+    from config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +46,7 @@ async def send_telegram_message(
     text: str,
 ) -> tuple[bool, int | None, str | None]:
     url = f"{settings.telegram_api_url}/bot{settings.bot_token}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
 
     try:
         response = await http_client.post(url, json=payload, timeout=settings.telegram_timeout_seconds)
@@ -86,4 +90,3 @@ async def send_telegram_message(
         },
     )
     return False, retry_after, description
-

@@ -35,7 +35,7 @@ _REDACTION_PATTERNS = (
     (re.compile(r"/bot\d+:[A-Za-z0-9_-]+"), "/bot<redacted>"),
     (re.compile(r"\b\d{8,10}:[A-Za-z0-9_-]{25,}\b"), "<telegram-token-redacted>"),
     (re.compile(r"Bearer\s+[A-Za-z0-9._~+/=-]{20,}", re.IGNORECASE), "Bearer <redacted>"),
-    (re.compile(r"(apikey['\"]?\s*[:=]\s*['\"]?)[A-Za-z0-9._~+/=-]{20,}", re.IGNORECASE), r"\1<redacted>"),
+    (re.compile(r"((?:api-key|apikey)['\"]?\s*[:=]\s*['\"]?)[A-Za-z0-9._~+/=-]{20,}", re.IGNORECASE), r"\1<redacted>"),
 )
 
 

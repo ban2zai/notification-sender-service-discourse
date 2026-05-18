@@ -96,6 +96,7 @@ Then replace the second `--env-file` in the compose commands with:
 - Nginx Proxy Manager should reach it through `proxy_network` by service name `notification-service` and port `8067`.
 - The service reaches Telegram via `telegram-bot-api:8081` on the existing `/var/tools` default network.
 - The service reaches Supabase via `supabase-kong:8000` on `supabase_default`.
+- The service enriches notifications through Discourse API using `DISCOURSE_API_KEY` and `DISCOURSE_API_USERNAME`.
 - Set `NOTIFICATION_LOG_PAYLOAD_DATA=true` to log `notification.data` during template debugging.
 
 ## Checks
@@ -121,5 +122,7 @@ On the VPS, use the merged compose validation command from the deployment sectio
 - Invalid HMAC signature returns `401`.
 - Expected internal failures after successful signature validation return `200 {"ok": true}` to avoid a Discourse retry storm.
 - Deduplication is atomic Redis Lua: `SET NX EX` + `XADD`.
+- New-topic deduplication is semantic: notification types `9`, `17`, and `36` collapse to one `new_topic:{topic_id}:{user_id}` key.
+- Drain enriches events from Discourse API cache-first and falls back to a minimal HTML message if enrichment fails.
 - `XACK` happens only after Telegram accepts the message or after the retry limit is exhausted.
 - Dead letters are JSON logs in stdout for Promtail/Loki, not DB rows.

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     supabase_key: str = Field(validation_alias=AliasChoices("SUPABASE_KEY", "SUPABASE_SERVICE_KEY"))
     redis_url: str = Field(default="redis://redis:6379", validation_alias="REDIS_URL")
     telegram_api_url: str = Field(default="http://telegram-bot-api:8081", validation_alias="TELEGRAM_API_URL")
+    discourse_api_key: str = Field(validation_alias="DISCOURSE_API_KEY")
+    discourse_api_username: str = Field(validation_alias="DISCOURSE_API_USERNAME")
 
     discourse_links_table: str = Field(validation_alias="DISCOURSE_LINKS_TABLE")
     discourse_base_url: str = Field(validation_alias="DISCOURSE_BASE_URL")
@@ -44,6 +46,14 @@ class Settings(BaseSettings):
 
     telegram_timeout_seconds: float = Field(default=10.0, validation_alias="TELEGRAM_TIMEOUT_SECONDS")
     supabase_timeout_seconds: float = Field(default=3.0, validation_alias="SUPABASE_TIMEOUT_SECONDS")
+    discourse_api_timeout_seconds: float = Field(default=3.0, validation_alias="DISCOURSE_API_TIMEOUT_SECONDS")
+    discourse_topic_cache_ttl_seconds: int = Field(default=1800, validation_alias="DISCOURSE_TOPIC_CACHE_TTL_SECONDS")
+    discourse_post_cache_ttl_seconds: int = Field(default=1800, validation_alias="DISCOURSE_POST_CACHE_TTL_SECONDS")
+    discourse_categories_cache_ttl_seconds: int = Field(
+        default=43200,
+        validation_alias="DISCOURSE_CATEGORIES_CACHE_TTL_SECONDS",
+    )
+    telegram_excerpt_max_chars: int = Field(default=400, validation_alias="TELEGRAM_EXCERPT_MAX_CHARS")
     telegram_global_rate_per_second: float = Field(default=25.0, validation_alias="TELEGRAM_GLOBAL_RATE_PER_SECOND")
     telegram_chat_min_interval_seconds: float = Field(
         default=1.05,

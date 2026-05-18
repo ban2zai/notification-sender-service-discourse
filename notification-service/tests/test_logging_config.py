@@ -17,6 +17,11 @@ class LoggingConfigTests(unittest.TestCase):
 
         self.assertEqual(_redact(value), "Authorization: Bearer <redacted>")
 
+    def test_redacts_discourse_api_key(self):
+        value = "Api-Key: abcdefghijklmnopqrstuvwxyz1234567890"
+
+        self.assertEqual(_redact(value), "Api-Key: <redacted>")
+
 
 if __name__ == "__main__":
     unittest.main()
