@@ -43,7 +43,7 @@ def render_notification_message(
 
     if event_kind == "new_topic":
         return _with_optional_excerpt(
-            f"Новая тема: <b>{title}</b>\n"
+            f"Новая тема: <b>«{title}»</b>\n"
             f"Категория: <b>{category}</b>\n"
             f"Теги: <b>{tags}</b>",
             excerpt,
@@ -52,7 +52,7 @@ def render_notification_message(
 
     if event_kind == "new_post":
         return _with_optional_excerpt(
-            f"Новый пост в теме: <b>{title}</b>\n"
+            f"Новый пост в теме: <b>«{title}»</b>\n"
             f"Категория: <b>{category}</b>\n"
             f"Теги: <b>{tags}</b>",
             excerpt,
@@ -60,14 +60,14 @@ def render_notification_message(
         ), url
 
     headers = {
-        "mention": f"<b>{username}</b> упомянул тебя в теме <b>{title}</b>",
-        "reply": f"<b>{username}</b> ответил на твой пост в теме <b>{title}</b>",
-        "quote": f"<b>{username}</b> процитировал тебя в теме <b>{title}</b>",
-        "edit": f"<b>{username}</b> отредактировал пост в теме <b>{title}</b>",
-        "private_message": f"<b>{username}</b> написал личное сообщение: <b>{title}</b>",
-        "group_mention": f"<b>{username}</b> упомянул группу в теме <b>{title}</b>",
+        "mention": f"<b>{username}</b> упомянул вас в теме <b>«{title}»</b>",
+        "reply": f"<b>{username}</b> ответил в теме <b>«{title}»</b>",
+        "quote": f"<b>{username}</b> процитировал вас в теме <b>«{title}»</b>",
+        "edit": f"<b>{username}</b> отредактировал пост в теме <b>«{title}»</b>",
+        "private_message": f"<b>{username}</b> написал личное сообщение: <b>«{title}»</b>",
+        "group_mention": f"<b>{username}</b> упомянул группу в теме <b>«{title}»</b>",
     }
-    header = headers.get(event_kind, f"Уведомление в теме <b>{title}</b>")
+    header = headers.get(event_kind, f"Уведомление в теме <b>«{title}»</b>")
     return _with_optional_excerpt(header, excerpt, safe_url), url
 
 
@@ -91,7 +91,7 @@ def render_fallback_message(base_url: str, notification: dict[str, Any], event_k
         "private_message": "Личное сообщение",
         "group_mention": "Упоминание группы",
     }.get(event_kind, "Уведомление")
-    return f"{label}: <b>{title}</b>\n{_html(url)}", url
+    return f"{label}: <b>«{title}»</b>\n{_html(url)}", url
 
 
 def _with_optional_excerpt(header: str, excerpt: str, url: str) -> str:
@@ -127,4 +127,7 @@ def _actor_username(enriched: dict[str, Any], data: dict[str, Any]) -> str:
         return str(enriched["actor_username"])
     if enriched.get("actor_lookup_failed"):
         return "anonuser"
-    return str(data.get("display_username") or data.get("original_username") or "кто-то")
+    username = str(data.get("original_username") or "").strip()
+    if username:
+        return username if username.startswith("@") else f"@{username}"
+    return str(data.get("display_username") or "кто-то")

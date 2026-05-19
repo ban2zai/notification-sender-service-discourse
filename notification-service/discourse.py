@@ -68,7 +68,7 @@ async def enrich_notification(
 
     topic_post = _find_topic_post(enriched["topic"], post_id, notification.get("post_number"))
     actor_source = enriched["post"] or topic_post or {}
-    is_anonymous = _is_anonymous(notification.get("data") or {}, actor_source, topic_post, enriched["topic"])
+    is_anonymous = _is_anonymous(notification.get("data") or {}, actor_source, topic_post)
     enriched["is_anonymous"] = is_anonymous
     enriched["actor_username"] = "anonuser" if is_anonymous else _display_username(actor_source)
 
@@ -102,7 +102,10 @@ def _is_anonymous(*sources: dict[str, Any]) -> bool:
 
 
 def _display_username(source: dict[str, Any]) -> str:
-    return str(source.get("display_username") or source.get("username") or source.get("name") or "")
+    username = str(source.get("username") or "").strip()
+    if username:
+        return username if username.startswith("@") else f"@{username}"
+    return str(source.get("display_username") or source.get("name") or "")
 
 
 def _truthy(value: Any) -> bool:

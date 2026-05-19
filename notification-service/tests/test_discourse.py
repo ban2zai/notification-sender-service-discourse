@@ -144,6 +144,7 @@ class DiscourseTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "id": 1201,
                         "display_username": "Regular User",
+                        "username": "regular_user",
                     }
                 ),
             }
@@ -158,7 +159,55 @@ class DiscourseTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(had_error)
         self.assertFalse(data["is_anonymous"])
-        self.assertEqual(data["actor_username"], "Regular User")
+        self.assertEqual(data["actor_username"], "@regular_user")
+
+    async def test_enrich_notification_does_not_hide_regular_reply_in_anonymous_topic(self):
+        redis = FakeRedis()
+        http = FakeHttp(
+            {
+                "https://forum.example.com/t/531.json": FakeResponse(
+                    {
+                        "title": "Anonymous topic",
+                        "is_anonymous_topic": 1,
+                        "post_stream": {
+                            "posts": [
+                                {
+                                    "id": 1395,
+                                    "post_number": 1,
+                                    "username": "AleskerovTI",
+                                    "is_anonymous_post": 1,
+                                },
+                                {
+                                    "id": 1396,
+                                    "post_number": 2,
+                                    "username": "calayx",
+                                    "is_anonymous_post": 0,
+                                },
+                            ]
+                        },
+                    }
+                ),
+                "https://forum.example.com/posts/1396.json": FakeResponse(
+                    {
+                        "id": 1396,
+                        "post_number": 2,
+                        "username": "calayx",
+                        "is_anonymous_post": 0,
+                    }
+                ),
+            }
+        )
+
+        data, had_error = await enrich_notification(
+            redis,
+            http,
+            self.settings(),
+            {"topic_id": 531, "post_number": 2, "data": {"original_post_id": 1396}},
+        )
+
+        self.assertFalse(had_error)
+        self.assertFalse(data["is_anonymous"])
+        self.assertEqual(data["actor_username"], "@calayx")
 
 
 if __name__ == "__main__":

@@ -68,7 +68,7 @@ class TemplateTests(unittest.TestCase):
 
         self.assertEqual(url, "https://forum.example.ru/t/456/1")
         self.assertIn("Новая тема", message)
-        self.assertIn("<b>A &amp; B</b>", message)
+        self.assertIn("<b>«A &amp; B»</b>", message)
         self.assertIn("<b>Обсуждения</b>", message)
         self.assertIn("ЗГУ, Программирование-БГУ", message)
         self.assertIn("<pre>Текст первого поста</pre>", message)
@@ -116,6 +116,29 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("<b>anonuser</b>", message)
         self.assertNotIn("real_user", message)
 
+    def test_render_actor_username_with_at_sign(self):
+        message, _ = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 2,
+                "user_id": 123,
+                "topic_id": 456,
+                "post_number": 2,
+                "data": {"topic_title": "Reply", "original_username": "fallback_user"},
+            },
+            "reply",
+            {
+                "topic": {"title": "Reply"},
+                "post": {"raw": "text"},
+                "category": "",
+                "actor_username": "@calayx",
+            },
+            400,
+        )
+
+        self.assertIn("<b>@calayx</b>", message)
+        self.assertNotIn("fallback_user", message)
+
     def test_render_unknown_actor_after_lookup_failure_safely(self):
         message, _ = render_notification_message(
             "https://forum.example.ru",
@@ -153,6 +176,7 @@ class TemplateTests(unittest.TestCase):
 
         self.assertEqual(url, "https://forum.example.ru/t/456/1")
         self.assertIn("Fallback", message)
+        self.assertIn("<b>«Fallback»</b>", message)
         self.assertIn("\nhttps://forum.example.ru/t/456/1", message)
 
     def test_excerpt_cleanup_and_truncation(self):
