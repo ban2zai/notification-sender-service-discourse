@@ -35,7 +35,7 @@ def render_notification_message(
     )
 
     title = _html(topic.get("title") or data.get("topic_title") or notification.get("fancy_title") or "тема")
-    username = _html(_actor_username(enriched, data))
+    actor = _actor_html(base_url, enriched, data)
     category = _html(enriched.get("category") or "не указана")
     tags = _format_tags(topic.get("tags") or [])
     excerpt = _html(build_excerpt(post, excerpt_max_chars)) if event_kind != "private_message" else ""
@@ -52,20 +52,18 @@ def render_notification_message(
 
     if event_kind == "new_post":
         return _with_optional_excerpt(
-            f"Новый пост в теме: <b>«{title}»</b>\n"
-            f"Категория: <b>{category}</b>\n"
-            f"Теги: <b>{tags}</b>",
+            f"<b>{actor}</b> ответил в теме <b>«{title}»</b>",
             excerpt,
             safe_url,
         ), url
 
     headers = {
-        "mention": f"<b>{username}</b> упомянул вас в теме <b>«{title}»</b>",
-        "reply": f"<b>{username}</b> ответил в теме <b>«{title}»</b>",
-        "quote": f"<b>{username}</b> процитировал вас в теме <b>«{title}»</b>",
-        "edit": f"<b>{username}</b> отредактировал пост в теме <b>«{title}»</b>",
-        "private_message": f"<b>{username}</b> написал личное сообщение: <b>«{title}»</b>",
-        "group_mention": f"<b>{username}</b> упомянул группу в теме <b>«{title}»</b>",
+        "mention": f"<b>{actor}</b> упомянул вас в теме <b>«{title}»</b>",
+        "reply": f"<b>{actor}</b> ответил в теме <b>«{title}»</b>",
+        "quote": f"<b>{actor}</b> процитировал вас в теме <b>«{title}»</b>",
+        "edit": f"<b>{actor}</b> отредактировал пост в теме <b>«{title}»</b>",
+        "private_message": f"<b>{actor}</b> написал личное сообщение: <b>«{title}»</b>",
+        "group_mention": f"<b>{actor}</b> упомянул группу в теме <b>«{title}»</b>",
     }
     header = headers.get(event_kind, f"Уведомление в теме <b>«{title}»</b>")
     return _with_optional_excerpt(header, excerpt, safe_url), url
@@ -118,6 +116,22 @@ def _format_tags(tags: list[Any]) -> str:
 
 def _html(value: object) -> str:
     return escape(str(value or ""), quote=False)
+
+
+def _html_attr(value: object) -> str:
+    return escape(str(value or ""), quote=True)
+
+
+def _actor_html(base_url: str, enriched: dict[str, Any], data: dict[str, Any]) -> str:
+    username = _actor_username(enriched, data)
+    if username == "anonuser":
+        return "[anonuser]"
+    if not username.startswith("@"):
+        return _html(username)
+
+    clean_username = username[1:]
+    href = f"{base_url.rstrip('/')}/u/{clean_username}/summary"
+    return f'<a href="{_html_attr(href)}">{_html(username)}</a>'
 
 
 def _actor_username(enriched: dict[str, Any], data: dict[str, Any]) -> str:

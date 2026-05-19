@@ -113,7 +113,7 @@ class TemplateTests(unittest.TestCase):
             400,
         )
 
-        self.assertIn("<b>anonuser</b>", message)
+        self.assertIn("<b>[anonuser]</b>", message)
         self.assertNotIn("real_user", message)
 
     def test_render_actor_username_with_at_sign(self):
@@ -136,7 +136,7 @@ class TemplateTests(unittest.TestCase):
             400,
         )
 
-        self.assertIn("<b>@calayx</b>", message)
+        self.assertIn('<b><a href="https://forum.example.ru/u/calayx/summary">@calayx</a></b>', message)
         self.assertNotIn("fallback_user", message)
 
     def test_render_unknown_actor_after_lookup_failure_safely(self):
@@ -159,8 +159,36 @@ class TemplateTests(unittest.TestCase):
             400,
         )
 
-        self.assertIn("<b>anonuser</b>", message)
+        self.assertIn("<b>[anonuser]</b>", message)
         self.assertNotIn("real_user", message)
+
+    def test_render_new_post_like_reply_without_category_tags(self):
+        message, url = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 36,
+                "user_id": 123,
+                "topic_id": 531,
+                "post_number": 5,
+                "data": {"topic_title": "Анонимуз", "original_username": "fallback_user"},
+            },
+            "new_post",
+            {
+                "topic": {"title": "Анонимуз", "tags": [{"name": "БГУ"}]},
+                "post": {"raw": "Ответ 1"},
+                "category": "Обсуждения",
+                "actor_username": "@calayx",
+            },
+            400,
+        )
+
+        self.assertEqual(url, "https://forum.example.ru/t/531/5")
+        self.assertIn('<b><a href="https://forum.example.ru/u/calayx/summary">@calayx</a></b>', message)
+        self.assertIn("ответил в теме", message)
+        self.assertIn("<b>«Анонимуз»</b>", message)
+        self.assertIn("<pre>Ответ 1</pre>", message)
+        self.assertNotIn("Категория", message)
+        self.assertNotIn("Теги", message)
 
     def test_render_fallback_message(self):
         message, url = render_fallback_message(
