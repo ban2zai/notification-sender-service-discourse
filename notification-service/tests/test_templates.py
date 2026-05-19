@@ -27,6 +27,28 @@ class EventTests(unittest.TestCase):
 
         self.assertEqual(keys, {"new_topic:456:123"})
 
+    def test_reply_idempotency_uses_notification_id(self):
+        first = build_idempotency_key(
+            {"id": 5101, "notification_type": 2, "topic_id": 534, "post_number": 2, "user_id": 1},
+            "reply",
+        )
+        second = build_idempotency_key(
+            {"id": 5102, "notification_type": 2, "topic_id": 534, "post_number": 2, "user_id": 1},
+            "reply",
+        )
+
+        self.assertEqual(first, "reply:5101:1")
+        self.assertEqual(second, "reply:5102:1")
+        self.assertNotEqual(first, second)
+
+    def test_reply_idempotency_falls_back_without_notification_id(self):
+        key = build_idempotency_key(
+            {"notification_type": 2, "topic_id": 534, "post_number": 2, "user_id": 1},
+            "reply",
+        )
+
+        self.assertEqual(key, "reply:534:2:1")
+
 
 class TemplateTests(unittest.TestCase):
     def test_post_url_contains_post_number_for_regular_notifications(self):

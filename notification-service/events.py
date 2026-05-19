@@ -40,6 +40,10 @@ def build_idempotency_key(notification: dict[str, Any], event_kind: str) -> str:
     if event_kind == "new_post":
         return f"new_post:{topic_id}:{post_number}:{user_id}"
 
+    notification_id = notification.get("id")
+    if notification_id:
+        return f"{event_kind}:{notification_id}:{user_id}"
+
     return f"{event_kind}:{topic_id}:{post_number}:{user_id}"
 
 
@@ -48,4 +52,3 @@ def _to_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
