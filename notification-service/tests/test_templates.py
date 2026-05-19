@@ -93,7 +93,7 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("<b>«A &amp; B»</b>", message)
         self.assertIn("<b>Обсуждения</b>", message)
         self.assertIn("ЗГУ, Программирование-БГУ", message)
-        self.assertIn("<pre>Текст первого поста</pre>", message)
+        self.assertIn("<blockquote>Текст первого поста</blockquote>", message)
         self.assertIn("\nhttps://forum.example.ru/t/456/1", message)
 
     def test_render_private_message_without_excerpt(self):
@@ -111,7 +111,7 @@ class TemplateTests(unittest.TestCase):
             400,
         )
 
-        self.assertNotIn("<pre>", message)
+        self.assertNotIn("<blockquote>", message)
         self.assertNotIn("secret", message)
 
     def test_render_anonymous_actor(self):
@@ -208,9 +208,33 @@ class TemplateTests(unittest.TestCase):
         self.assertIn('<b><a href="https://forum.example.ru/u/calayx/summary">@calayx</a></b>', message)
         self.assertIn("ответил в теме", message)
         self.assertIn("<b>«Анонимуз»</b>", message)
-        self.assertIn("<pre>Ответ 1</pre>", message)
+        self.assertIn("<blockquote>Ответ 1</blockquote>", message)
         self.assertNotIn("Категория", message)
         self.assertNotIn("Теги", message)
+
+    def test_render_reply_url_uses_enriched_post_number(self):
+        message, url = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 2,
+                "user_id": 123,
+                "topic_id": 534,
+                "post_number": 10,
+                "data": {"topic_title": "Form", "original_username": "fallback_user"},
+            },
+            "reply",
+            {
+                "topic": {"title": "Form"},
+                "post": {"raw": "Ответ 6", "post_number": 11},
+                "category": "",
+                "actor_username": "@AleskerovTI",
+            },
+            400,
+        )
+
+        self.assertEqual(url, "https://forum.example.ru/t/534/11")
+        self.assertIn("\nhttps://forum.example.ru/t/534/11", message)
+        self.assertNotIn("https://forum.example.ru/t/534/10", message)
 
     def test_render_fallback_message(self):
         message, url = render_fallback_message(

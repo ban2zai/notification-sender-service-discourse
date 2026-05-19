@@ -27,11 +27,12 @@ def render_notification_message(
     post = enriched.get("post") or {}
 
     notification_type = int(notification.get("notification_type") or 0)
+    post_number = post.get("post_number") or notification.get("post_number", "")
     url = build_topic_url(
         base_url=base_url,
         notification_type=notification_type,
         topic_id=notification.get("topic_id", ""),
-        post_number=notification.get("post_number", ""),
+        post_number=post_number,
     )
 
     title = _html(topic.get("title") or data.get("topic_title") or notification.get("fancy_title") or "тема")
@@ -94,7 +95,7 @@ def render_fallback_message(base_url: str, notification: dict[str, Any], event_k
 
 def _with_optional_excerpt(header: str, excerpt: str, url: str) -> str:
     if excerpt:
-        return f"{header}\n\n<pre>{excerpt}</pre>\n{url}"
+        return f"{header}\n\n<blockquote>{excerpt}</blockquote>\n{url}"
     return f"{header}\n{url}"
 
 
