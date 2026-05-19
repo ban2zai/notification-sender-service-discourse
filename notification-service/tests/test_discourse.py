@@ -95,6 +95,71 @@ class DiscourseTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(had_error)
         self.assertEqual(data["topic"], {})
 
+    async def test_enrich_notification_marks_anonymous_post(self):
+        redis = FakeRedis()
+        http = FakeHttp(
+            {
+                "https://forum.example.com/t/438.json": FakeResponse(
+                    {
+                        "title": "Anonymous topic",
+                        "post_stream": {
+                            "posts": [
+                                {
+                                    "id": 1184,
+                                    "post_number": 1,
+                                    "display_username": "Real User",
+                                    "is_anonymous_post": 1,
+                                }
+                            ]
+                        },
+                    }
+                ),
+                "https://forum.example.com/posts/1184.json": FakeResponse(
+                    {
+                        "id": 1184,
+                        "display_username": "Real User",
+                        "is_anonymous_post": 1,
+                    }
+                ),
+            }
+        )
+
+        data, had_error = await enrich_notification(
+            redis,
+            http,
+            self.settings(),
+            {"topic_id": 438, "post_number": 1, "data": {"original_post_id": 1184}},
+        )
+
+        self.assertFalse(had_error)
+        self.assertTrue(data["is_anonymous"])
+        self.assertEqual(data["actor_username"], "anonuser")
+
+    async def test_enrich_notification_works_without_anonymous_plugin_fields(self):
+        redis = FakeRedis()
+        http = FakeHttp(
+            {
+                "https://forum.example.com/t/438.json": FakeResponse({"title": "Regular topic"}),
+                "https://forum.example.com/posts/1201.json": FakeResponse(
+                    {
+                        "id": 1201,
+                        "display_username": "Regular User",
+                    }
+                ),
+            }
+        )
+
+        data, had_error = await enrich_notification(
+            redis,
+            http,
+            self.settings(),
+            {"topic_id": 438, "post_number": 5, "data": {"original_post_id": 1201}},
+        )
+
+        self.assertFalse(had_error)
+        self.assertFalse(data["is_anonymous"])
+        self.assertEqual(data["actor_username"], "Regular User")
+
 
 if __name__ == "__main__":
     unittest.main()

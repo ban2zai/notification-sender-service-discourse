@@ -92,6 +92,53 @@ class TemplateTests(unittest.TestCase):
         self.assertNotIn("<pre>", message)
         self.assertNotIn("secret", message)
 
+    def test_render_anonymous_actor(self):
+        message, _ = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 2,
+                "user_id": 123,
+                "topic_id": 456,
+                "post_number": 2,
+                "data": {"topic_title": "Anon", "original_username": "real_user"},
+            },
+            "reply",
+            {
+                "topic": {"title": "Anon"},
+                "post": {"raw": "text"},
+                "category": "",
+                "is_anonymous": True,
+                "actor_username": "anonuser",
+            },
+            400,
+        )
+
+        self.assertIn("<b>anonuser</b>", message)
+        self.assertNotIn("real_user", message)
+
+    def test_render_unknown_actor_after_lookup_failure_safely(self):
+        message, _ = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 2,
+                "user_id": 123,
+                "topic_id": 456,
+                "post_number": 2,
+                "data": {"topic_title": "Unknown", "original_username": "real_user"},
+            },
+            "reply",
+            {
+                "topic": {"title": "Unknown"},
+                "post": {},
+                "category": "",
+                "actor_lookup_failed": True,
+            },
+            400,
+        )
+
+        self.assertIn("<b>anonuser</b>", message)
+        self.assertNotIn("real_user", message)
+
     def test_render_fallback_message(self):
         message, url = render_fallback_message(
             "https://forum.example.ru",

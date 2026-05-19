@@ -35,7 +35,7 @@ def render_notification_message(
     )
 
     title = _html(topic.get("title") or data.get("topic_title") or notification.get("fancy_title") or "тема")
-    username = _html(data.get("display_username") or data.get("original_username") or "кто-то")
+    username = _html(_actor_username(enriched, data))
     category = _html(enriched.get("category") or "не указана")
     tags = _format_tags(topic.get("tags") or [])
     excerpt = _html(build_excerpt(post, excerpt_max_chars)) if event_kind != "private_message" else ""
@@ -118,3 +118,13 @@ def _format_tags(tags: list[Any]) -> str:
 
 def _html(value: object) -> str:
     return escape(str(value or ""), quote=False)
+
+
+def _actor_username(enriched: dict[str, Any], data: dict[str, Any]) -> str:
+    if enriched.get("is_anonymous"):
+        return "anonuser"
+    if enriched.get("actor_username"):
+        return str(enriched["actor_username"])
+    if enriched.get("actor_lookup_failed"):
+        return "anonuser"
+    return str(data.get("display_username") or data.get("original_username") or "кто-то")

@@ -28,6 +28,9 @@ async def enrich_notification(
         "topic": {},
         "post": {},
         "category": "",
+        "actor_username": "",
+        "actor_lookup_failed": False,
+        "is_anonymous": False,
     }
     had_error = False
 
@@ -43,6 +46,7 @@ async def enrich_notification(
         enriched["topic"] = topic or {}
         had_error = had_error or topic_error
 
+    post_error = False
     if post_id:
         post, post_error = await _get_cached_json(
             redis_client,
@@ -54,12 +58,19 @@ async def enrich_notification(
         )
         enriched["post"] = post or {}
         had_error = had_error or post_error
+        enriched["actor_lookup_failed"] = post_error
 
     category_id = enriched["topic"].get("category_id")
     if category_id:
         categories, categories_error = await _get_categories(redis_client, http_client, settings)
         enriched["category"] = categories.get(str(category_id), "")
         had_error = had_error or categories_error
+
+    topic_post = _find_topic_post(enriched["topic"], post_id, notification.get("post_number"))
+    actor_source = enriched["post"] or topic_post or {}
+    is_anonymous = _is_anonymous(notification.get("data") or {}, actor_source, topic_post, enriched["topic"])
+    enriched["is_anonymous"] = is_anonymous
+    enriched["actor_username"] = "anonuser" if is_anonymous else _display_username(actor_source)
 
     return enriched, had_error
 
@@ -70,6 +81,44 @@ def build_excerpt(post: dict[str, Any], max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return text[: max_chars - 1].rstrip() + "…"
+
+
+def _find_topic_post(topic: dict[str, Any], post_id: Any, post_number: Any) -> dict[str, Any]:
+    posts = (topic.get("post_stream") or {}).get("posts") or []
+    for post in posts:
+        if _values_equal(post.get("id"), post_id):
+            return post
+    for post in posts:
+        if _values_equal(post.get("post_number"), post_number):
+            return post
+    return {}
+
+
+def _is_anonymous(*sources: dict[str, Any]) -> bool:
+    for source in sources:
+        if _truthy(source.get("is_anonymous_post")) or _truthy(source.get("is_anonymous_topic")):
+            return True
+    return False
+
+
+def _display_username(source: dict[str, Any]) -> str:
+    return str(source.get("display_username") or source.get("username") or source.get("name") or "")
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value == 1
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return False
+
+
+def _values_equal(left: Any, right: Any) -> bool:
+    if left is None or right is None:
+        return False
+    return str(left) == str(right)
 
 
 async def _get_categories(
