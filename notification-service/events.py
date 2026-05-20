@@ -3,7 +3,7 @@ from typing import Any
 
 NEW_TOPIC_TYPES = {9, 17, 36}
 NEW_POST_TYPES = {9, 36}
-SUPPORTED_NOTIFICATION_TYPES = {1, 2, 3, 4, 6, 9, 15, 17, 36}
+SUPPORTED_NOTIFICATION_TYPES = {1, 2, 3, 4, 6, 9, 15, 17, 36, 167}
 
 
 def classify_event(notification: dict[str, Any]) -> str | None:
@@ -27,6 +27,7 @@ def classify_event(notification: dict[str, Any]) -> str | None:
         15: "group_mention",
         17: "new_topic",
         36: "new_topic",
+        167: "tz_approval",
     }.get(notification_type)
 
 

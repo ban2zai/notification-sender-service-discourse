@@ -16,6 +16,9 @@ class EventTests(unittest.TestCase):
     def test_classifies_new_post(self):
         self.assertEqual(classify_event({"notification_type": 36, "post_number": 3}), "new_post")
 
+    def test_classifies_tz_approval(self):
+        self.assertEqual(classify_event({"notification_type": 167, "post_number": 10}), "tz_approval")
+
     def test_new_topic_idempotency_dedupes_notification_types(self):
         keys = {
             build_idempotency_key(
@@ -48,6 +51,14 @@ class EventTests(unittest.TestCase):
         )
 
         self.assertEqual(key, "reply:534:2:1")
+
+    def test_tz_approval_idempotency_uses_notification_id(self):
+        key = build_idempotency_key(
+            {"id": 5269, "notification_type": 167, "topic_id": 535, "post_number": 10, "user_id": 537},
+            "tz_approval",
+        )
+
+        self.assertEqual(key, "tz_approval:5269:537")
 
 
 class TemplateTests(unittest.TestCase):
@@ -252,6 +263,52 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("Fallback", message)
         self.assertIn("<b>«Fallback»</b>", message)
         self.assertIn("\nhttps://forum.example.ru/t/456/1", message)
+
+    def test_render_tz_approval_approved(self):
+        message, url = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 167,
+                "user_id": 537,
+                "topic_id": 535,
+                "post_number": 11,
+                "data": {
+                    "action": "approved",
+                    "display_username": "calayx",
+                    "topic_title": "ТЗ",
+                },
+            },
+            "tz_approval",
+            {"topic": {}, "post": {}, "category": ""},
+            400,
+        )
+
+        self.assertEqual(url, "https://forum.example.ru/t/535/11")
+        self.assertIn('<b><a href="https://forum.example.ru/u/calayx/summary">@calayx</a></b>', message)
+        self.assertIn("одобрил ТЗ в теме", message)
+        self.assertIn("<b>«ТЗ»</b>", message)
+        self.assertIn("\nhttps://forum.example.ru/t/535/11", message)
+
+    def test_render_tz_approval_unapproved(self):
+        message, _ = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 167,
+                "user_id": 537,
+                "topic_id": 535,
+                "post_number": 10,
+                "data": {
+                    "action": "unapproved",
+                    "display_username": "calayx",
+                    "topic_title": "ТЗ",
+                },
+            },
+            "tz_approval",
+            {"topic": {}, "post": {}, "category": ""},
+            400,
+        )
+
+        self.assertIn("снял одобрение с ТЗ в теме", message)
 
     def test_excerpt_cleanup_and_truncation(self):
         self.assertEqual(build_excerpt({"raw": "a\n\n b\tc"}, 100), "a b c")

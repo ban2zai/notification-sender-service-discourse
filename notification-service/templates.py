@@ -58,6 +58,14 @@ def render_notification_message(
             safe_url,
         ), url
 
+    if event_kind == "tz_approval":
+        action = str(data.get("action") or "").strip()
+        action_text = {
+            "approved": "одобрил ТЗ в теме",
+            "unapproved": "снял одобрение с ТЗ в теме",
+        }.get(action, "изменил одобрение ТЗ в теме")
+        return f"<b>{actor}</b> {action_text} <b>«{title}»</b>\n{safe_url}", url
+
     headers = {
         "mention": f"<b>{actor}</b> упомянул вас в теме <b>«{title}»</b>",
         "reply": f"<b>{actor}</b> ответил в теме <b>«{title}»</b>",
@@ -89,6 +97,7 @@ def render_fallback_message(base_url: str, notification: dict[str, Any], event_k
         "edit": "Редактирование",
         "private_message": "Личное сообщение",
         "group_mention": "Упоминание группы",
+        "tz_approval": "Одобрение ТЗ",
     }.get(event_kind, "Уведомление")
     return f"{label}: <b>«{title}»</b>\n{_html(url)}", url
 
@@ -142,6 +151,9 @@ def _actor_username(enriched: dict[str, Any], data: dict[str, Any]) -> str:
         return str(enriched["actor_username"])
     if enriched.get("actor_lookup_failed"):
         return "anonuser"
+    if data.get("display_username") and str(data.get("display_username")) != "system":
+        username = str(data.get("display_username") or "").strip()
+        return username if username.startswith("@") else f"@{username}"
     username = str(data.get("original_username") or "").strip()
     if username:
         return username if username.startswith("@") else f"@{username}"
