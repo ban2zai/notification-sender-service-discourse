@@ -44,6 +44,7 @@ async def send_telegram_message(
     settings: Settings,
     chat_id: int,
     text: str,
+    reply_markup: dict | None = None,
 ) -> tuple[bool, int | None, str | None]:
     url = f"{settings.telegram_api_url}/bot{settings.bot_token}/sendMessage"
     payload = {
@@ -52,6 +53,8 @@ async def send_telegram_message(
         "parse_mode": "HTML",
         "disable_web_page_preview": True,
     }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
 
     try:
         response = await http_client.post(url, json=payload, timeout=settings.telegram_timeout_seconds)

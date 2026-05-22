@@ -97,6 +97,9 @@ Then replace the second `--env-file` in the compose commands with:
 - The service reaches Telegram via `telegram-bot-api:8081` on the existing `/var/tools` default network.
 - The service reaches Supabase via `supabase-kong:8000` on `supabase_default`.
 - The service enriches notifications through Discourse API using `DISCOURSE_API_KEY` and `DISCOURSE_API_USERNAME`.
+- Account linking endpoints are protected by `ACCOUNT_LINK_API_TOKEN`.
+- n8n should call `POST /telegram/link-token` to create a short-lived forum link for `/settings`.
+- The Discourse plugin should call `POST /telegram/account-link` to finalize the token with `discourse_user_id`, `discourse_username`, `email`, and `linked_at`.
 - Set `NOTIFICATION_LOG_PAYLOAD_DATA=true` to log `notification.data` during template debugging.
 
 ## Checks
@@ -120,6 +123,9 @@ On the VPS, use the merged compose validation command from the deployment sectio
 ## Important Behavior
 
 - Invalid HMAC signature returns `401`.
+- Invalid account-link Bearer token returns `401`.
+- Account-link tokens are stored in Redis with `ACCOUNT_LINK_TOKEN_TTL_SECONDS` TTL.
+- Expired account-link tokens return `410`; conflicting active links return `409`.
 - Expected internal failures after successful signature validation return `200 {"ok": true}` to avoid a Discourse retry storm.
 - Deduplication is atomic Redis Lua: `SET NX EX` + `XADD`.
 - New-topic deduplication is semantic: notification types `9`, `17`, and `36` collapse to one `new_topic:{topic_id}:{user_id}` key.

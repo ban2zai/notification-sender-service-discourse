@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import unittest
 
-from security import is_valid_discourse_signature
+from security import is_valid_bearer_token, is_valid_discourse_signature
 
 
 class SecurityTests(unittest.TestCase):
@@ -16,7 +16,14 @@ class SecurityTests(unittest.TestCase):
     def test_invalid_discourse_signature(self):
         self.assertFalse(is_valid_discourse_signature(b"{}", "sha256=bad", "secret"))
 
+    def test_valid_bearer_token(self):
+        self.assertTrue(is_valid_bearer_token("Bearer secret", "secret"))
+
+    def test_invalid_bearer_token(self):
+        self.assertFalse(is_valid_bearer_token("Bearer bad", "secret"))
+        self.assertFalse(is_valid_bearer_token("secret", "secret"))
+        self.assertFalse(is_valid_bearer_token("Bearer secret", ""))
+
 
 if __name__ == "__main__":
     unittest.main()
-

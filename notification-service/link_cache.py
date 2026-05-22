@@ -101,6 +101,17 @@ class TelegramLinkCache:
 
         return None
 
+    async def remember(self, user_id: int, chat_id: int) -> None:
+        if not self._settings.supabase_links_cache_enabled:
+            return
+
+        async with self._lock:
+            if not self._cache_is_usable_locked():
+                self._links = {}
+
+            self._links[user_id] = chat_id
+            self._last_success_at = time.monotonic()
+
     async def _lookup_cached(self, user_id: int) -> int | None:
         async with self._lock:
             if not self._cache_is_usable_locked():

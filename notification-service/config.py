@@ -23,7 +23,10 @@ class Settings(BaseSettings):
     discourse_api_username: str = Field(validation_alias="DISCOURSE_API_USERNAME")
 
     discourse_links_table: str = Field(validation_alias="DISCOURSE_LINKS_TABLE")
+    telegram_users_table: str = Field(validation_alias="TELEGRAM_USERS_TABLE")
     discourse_base_url: str = Field(validation_alias="DISCOURSE_BASE_URL")
+    account_link_api_token: str = Field(validation_alias="ACCOUNT_LINK_API_TOKEN")
+    account_link_token_ttl_seconds: int = Field(default=600, validation_alias="ACCOUNT_LINK_TOKEN_TTL_SECONDS")
 
     host: str = Field(default="0.0.0.0", validation_alias="HOST")
     port: int = Field(default=8067, validation_alias="PORT")

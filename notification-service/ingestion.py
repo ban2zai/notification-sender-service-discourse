@@ -1,16 +1,22 @@
+from __future__ import annotations
+
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
-import redis.asyncio as aioredis
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from config import Settings
+from account_link import create_link_token, finalize_account_link
 from events import build_idempotency_key, classify_event
 from link_cache import TelegramLinkCache
-from security import is_valid_discourse_signature
+from security import is_valid_bearer_token, is_valid_discourse_signature
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis
+
+    from config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +60,30 @@ def create_app(
     async def healthz() -> dict[str, bool]:
         return {"ok": True}
 
+    @app.post("/telegram/link-token")
+    async def telegram_link_token(request: Request) -> JSONResponse:
+        if not _is_valid_account_link_auth(request, settings):
+            return JSONResponse({"ok": False}, status_code=401)
+
+        payload = await _read_json_body(request)
+        if payload is None:
+            return JSONResponse({"ok": False, "error": "invalid_json"}, status_code=400)
+
+        status_code, response = await create_link_token(redis_client, settings, payload)
+        return JSONResponse(response, status_code=status_code)
+
+    @app.post("/telegram/account-link")
+    async def telegram_account_link(request: Request) -> JSONResponse:
+        if not _is_valid_account_link_auth(request, settings):
+            return JSONResponse({"ok": False}, status_code=401)
+
+        payload = await _read_json_body(request)
+        if payload is None:
+            return JSONResponse({"ok": False, "error": "invalid_json"}, status_code=400)
+
+        status_code, response = await finalize_account_link(redis_client, http_client, settings, link_cache, payload)
+        return JSONResponse(response, status_code=status_code)
+
     @app.post("/webhook")
     async def webhook(request: Request) -> JSONResponse:
         raw_body = await request.body()
@@ -96,6 +126,24 @@ def create_app(
         return JSONResponse({"ok": True})
 
     return app
+
+
+def _is_valid_account_link_auth(request: Request, settings: Settings) -> bool:
+    return is_valid_bearer_token(
+        request.headers.get("Authorization", ""),
+        settings.account_link_api_token,
+    )
+
+
+async def _read_json_body(request: Request) -> dict[str, Any] | None:
+    try:
+        payload = await request.json()
+    except ValueError:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
 
 
 async def _handle_notification(
