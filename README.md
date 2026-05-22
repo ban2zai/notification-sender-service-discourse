@@ -16,6 +16,8 @@ Python service for delivering Discourse webhook notifications to Telegram throug
 - `deploy/docker-compose.notification-service.test.yml` - test overlay compose for `/var/tools` on the VPS.
 - `deploy/docker-compose.notification-service.prod.yml` - production overlay compose for `/var/tools` on the VPS.
 - `deploy/docker-compose.notification-service.yml` - legacy single-instance overlay kept for compatibility.
+- `deploy/deploy-notification-test.sh` - pulls the repo and deploys the test instance.
+- `deploy/deploy-notification-prod.sh` - pulls the repo and deploys the production instance.
 - `deploy/.env.notification.test.example` - test env template.
 - `deploy/.env.notification.prod.example` - production env template.
 
@@ -63,12 +65,7 @@ docker compose \
 Start only the test services:
 
 ```bash
-docker compose \
-  --env-file .env \
-  --env-file notification-sender-service-discourse/deploy/.env.notification.test \
-  -f docker-compose.yml \
-  -f notification-sender-service-discourse/deploy/docker-compose.notification-service.test.yml \
-  up -d --build --no-deps notification-redis-test notification-service-test
+notification-sender-service-discourse/deploy/deploy-notification-test.sh
 ```
 
 Run only `notification-redis-test` and `notification-service-test` during test rollout.
@@ -99,15 +96,17 @@ tgsender.b2zn8n.ru -> notification-service-prod:8067
 Production deploy command:
 
 ```bash
-docker compose \
-  --env-file .env \
-  --env-file notification-sender-service-discourse/deploy/.env.notification.prod \
-  -f docker-compose.yml \
-  -f notification-sender-service-discourse/deploy/docker-compose.notification-service.prod.yml \
-  up -d --build --no-deps notification-redis-prod notification-service-prod
+notification-sender-service-discourse/deploy/deploy-notification-prod.sh
 ```
 
 Keep test and production running as separate compose services. Do not switch one container between test and production env files.
+
+If executable bits are not preserved after cloning, run scripts through bash:
+
+```bash
+bash notification-sender-service-discourse/deploy/deploy-notification-test.sh
+bash notification-sender-service-discourse/deploy/deploy-notification-prod.sh
+```
 
 ## Runtime Notes
 
