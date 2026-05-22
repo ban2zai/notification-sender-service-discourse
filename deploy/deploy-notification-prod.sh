@@ -2,7 +2,8 @@
 set -euo pipefail
 
 TOOLS_DIR="${TOOLS_DIR:-/var/tools}"
-REPO_DIR="${REPO_DIR:-$TOOLS_DIR/notification-sender-service-discourse}"
+REPO_DIR="${REPO_DIR:-$TOOLS_DIR/notification-sender-service-discourse-prod}"
+EXPECTED_BRANCH="${EXPECTED_BRANCH:-main}"
 ENV_FILE="$REPO_DIR/deploy/.env.notification.prod"
 OVERLAY_FILE="$REPO_DIR/deploy/docker-compose.notification-service.prod.yml"
 
@@ -17,6 +18,12 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 cd "$REPO_DIR"
+
+current_branch="$(git branch --show-current)"
+if [[ "$current_branch" != "$EXPECTED_BRANCH" ]]; then
+  echo "Production deploy must run from branch '$EXPECTED_BRANCH', current branch is '$current_branch'." >&2
+  exit 1
+fi
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "Repository has uncommitted tracked changes. Commit, stash, or revert them before deploy." >&2

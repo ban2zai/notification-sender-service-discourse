@@ -28,27 +28,36 @@ Assumed VPS layout:
 ```text
 /var/tools/docker-compose.yml
 /var/tools/notification-sender-service-discourse/
+/var/tools/notification-sender-service-discourse-test/
+/var/tools/notification-sender-service-discourse-prod/
 ```
 
-Clone the repo under `/var/tools`:
+The base checkout stores Git metadata. Test and production are separate Git worktrees:
 
 ```bash
 cd /var/tools
 git clone <repo-url> notification-sender-service-discourse
+cd notification-sender-service-discourse
+git fetch origin
+git pull --ff-only
+git show-ref --verify --quiet refs/remotes/origin/staging || git push origin main:staging
+git checkout --detach
+git worktree add ../notification-sender-service-discourse-test staging
+git worktree add ../notification-sender-service-discourse-prod main
 ```
 
 Create a local test env file:
 
 ```bash
-cp notification-sender-service-discourse/deploy/.env.notification.test.example \
-   notification-sender-service-discourse/deploy/.env.notification.test
-chmod 600 notification-sender-service-discourse/deploy/.env.notification.test
+cp notification-sender-service-discourse-test/deploy/.env.notification.test.example \
+   notification-sender-service-discourse-test/deploy/.env.notification.test
+chmod 600 notification-sender-service-discourse-test/deploy/.env.notification.test
 ```
 
 Fill real values in:
 
 ```bash
-nano notification-sender-service-discourse/deploy/.env.notification.test
+nano notification-sender-service-discourse-test/deploy/.env.notification.test
 ```
 
 Validate the merged compose before starting anything:
@@ -56,16 +65,16 @@ Validate the merged compose before starting anything:
 ```bash
 docker compose \
   --env-file .env \
-  --env-file notification-sender-service-discourse/deploy/.env.notification.test \
+  --env-file notification-sender-service-discourse-test/deploy/.env.notification.test \
   -f docker-compose.yml \
-  -f notification-sender-service-discourse/deploy/docker-compose.notification-service.test.yml \
+  -f notification-sender-service-discourse-test/deploy/docker-compose.notification-service.test.yml \
   config
 ```
 
 Start only the test services:
 
 ```bash
-notification-sender-service-discourse/deploy/deploy-notification-test.sh
+notification-sender-service-discourse-test/deploy/deploy-notification-test.sh
 ```
 
 Run only `notification-redis-test` and `notification-service-test` during test rollout.
@@ -82,9 +91,9 @@ tgsender-test.b2zn8n.ru -> notification-service-test:8067
 Production mode uses `deploy/.env.notification.prod` and must be created only after test mode is verified:
 
 ```bash
-cp notification-sender-service-discourse/deploy/.env.notification.prod.example \
-   notification-sender-service-discourse/deploy/.env.notification.prod
-chmod 600 notification-sender-service-discourse/deploy/.env.notification.prod
+cp notification-sender-service-discourse-prod/deploy/.env.notification.prod.example \
+   notification-sender-service-discourse-prod/deploy/.env.notification.prod
+chmod 600 notification-sender-service-discourse-prod/deploy/.env.notification.prod
 ```
 
 Expose production through Nginx Proxy Manager as:
@@ -96,7 +105,7 @@ tgsender.b2zn8n.ru -> notification-service-prod:8067
 Production deploy command:
 
 ```bash
-notification-sender-service-discourse/deploy/deploy-notification-prod.sh
+notification-sender-service-discourse-prod/deploy/deploy-notification-prod.sh
 ```
 
 Keep test and production running as separate compose services. Do not switch one container between test and production env files.
@@ -104,9 +113,11 @@ Keep test and production running as separate compose services. Do not switch one
 If executable bits are not preserved after cloning, run scripts through bash:
 
 ```bash
-bash notification-sender-service-discourse/deploy/deploy-notification-test.sh
-bash notification-sender-service-discourse/deploy/deploy-notification-prod.sh
+bash notification-sender-service-discourse-test/deploy/deploy-notification-test.sh
+bash notification-sender-service-discourse-prod/deploy/deploy-notification-prod.sh
 ```
+
+The test deploy script must run from the `staging` worktree. The production deploy script must run from the `main` worktree.
 
 ## Runtime Notes
 

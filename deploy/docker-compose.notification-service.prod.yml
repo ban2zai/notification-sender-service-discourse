@@ -17,7 +17,7 @@ services:
 
   notification-service-prod:
     build:
-      context: ./notification-sender-service-discourse/notification-service
+      context: ./notification-sender-service-discourse-prod/notification-service
     restart: unless-stopped
     environment:
       BOT_TOKEN: ${NOTIFICATION_BOT_TOKEN:?set NOTIFICATION_BOT_TOKEN}
