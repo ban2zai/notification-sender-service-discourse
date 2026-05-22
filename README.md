@@ -13,7 +13,9 @@ Python service for delivering Discourse webhook notifications to Telegram throug
 
 - `notification-service/` - Python app: FastAPI ingestion, Redis Stream drain, pending-message reaper.
 - `docker-compose.yml` - local/dev compose for this repo only.
-- `deploy/docker-compose.notification-service.yml` - overlay compose for `/var/tools` on the VPS.
+- `deploy/docker-compose.notification-service.test.yml` - test overlay compose for `/var/tools` on the VPS.
+- `deploy/docker-compose.notification-service.prod.yml` - production overlay compose for `/var/tools` on the VPS.
+- `deploy/docker-compose.notification-service.yml` - legacy single-instance overlay kept for compatibility.
 - `deploy/.env.notification.test.example` - test env template.
 - `deploy/.env.notification.prod.example` - production env template.
 
@@ -54,26 +56,31 @@ docker compose \
   --env-file .env \
   --env-file notification-sender-service-discourse/deploy/.env.notification.test \
   -f docker-compose.yml \
-  -f notification-sender-service-discourse/deploy/docker-compose.notification-service.yml \
+  -f notification-sender-service-discourse/deploy/docker-compose.notification-service.test.yml \
   config
 ```
 
-Start only the new services:
+Start only the test services:
 
 ```bash
 docker compose \
   --env-file .env \
   --env-file notification-sender-service-discourse/deploy/.env.notification.test \
   -f docker-compose.yml \
-  -f notification-sender-service-discourse/deploy/docker-compose.notification-service.yml \
-  up -d --build --no-deps notification-redis notification-service
+  -f notification-sender-service-discourse/deploy/docker-compose.notification-service.test.yml \
+  up -d --build --no-deps notification-redis-test notification-service-test
 ```
 
-Run only `notification-redis` and `notification-service` during rollout.
+Run only `notification-redis-test` and `notification-service-test` during test rollout.
 
 ## Test vs Production
 
 Test mode uses `deploy/.env.notification.test` and points to the test Discourse forum/table/bot.
+Expose it through Nginx Proxy Manager as:
+
+```text
+tgsender-test.b2zn8n.ru -> notification-service-test:8067
+```
 
 Production mode uses `deploy/.env.notification.prod` and must be created only after test mode is verified:
 
@@ -83,17 +90,30 @@ cp notification-sender-service-discourse/deploy/.env.notification.prod.example \
 chmod 600 notification-sender-service-discourse/deploy/.env.notification.prod
 ```
 
-Then replace the second `--env-file` in the compose commands with:
+Expose production through Nginx Proxy Manager as:
+
+```text
+tgsender.b2zn8n.ru -> notification-service-prod:8067
+```
+
+Production deploy command:
 
 ```bash
---env-file notification-sender-service-discourse/deploy/.env.notification.prod
+docker compose \
+  --env-file .env \
+  --env-file notification-sender-service-discourse/deploy/.env.notification.prod \
+  -f docker-compose.yml \
+  -f notification-sender-service-discourse/deploy/docker-compose.notification-service.prod.yml \
+  up -d --build --no-deps notification-redis-prod notification-service-prod
 ```
+
+Keep test and production running as separate compose services. Do not switch one container between test and production env files.
 
 ## Runtime Notes
 
-- `notification-redis` is separate from other services and stores only this service queue.
-- `notification-service` has no published host ports by default.
-- Nginx Proxy Manager should reach it through `proxy_network` by service name `notification-service` and port `8067`.
+- `notification-redis-test` and `notification-redis-prod` are separate Redis instances.
+- `notification-service-test` and `notification-service-prod` have no published host ports by default.
+- Nginx Proxy Manager should reach them through `proxy_network` by service name and port `8067`.
 - The service reaches Telegram via `telegram-bot-api:8081` on the existing `/var/tools` default network.
 - The service reaches Supabase via `supabase-kong:8000` on `supabase_default`.
 - The service enriches notifications through Discourse API using `DISCOURSE_API_KEY` and `DISCOURSE_API_USERNAME`.
