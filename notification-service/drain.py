@@ -16,7 +16,7 @@ except ModuleNotFoundError:
     class ResponseError(Exception):
         pass
 
-from discourse import enrich_notification
+from discourse import enrich_notification, sanitize_quote_attribution
 from templates import render_fallback_message, render_notification_message
 from telegram import TelegramRateLimiter, send_telegram_message
 
@@ -177,6 +177,8 @@ async def _process_one(
                 enriched,
                 settings.telegram_excerpt_max_chars,
             )
+
+    text = sanitize_quote_attribution(text)
 
     await limiter.wait(chat_id)
     ok, retry_after, error = await send_telegram_message(http_client, settings, chat_id, text)

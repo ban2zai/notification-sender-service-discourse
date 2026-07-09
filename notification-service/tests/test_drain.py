@@ -86,6 +86,40 @@ class DrainTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent[0][0], 641388037)
         self.assertIn("Fallback topic", sent[0][1])
 
+    async def test_process_one_sanitizes_ready_message_text_before_send(self):
+        sent = []
+
+        async def fake_send(http_client, settings, chat_id, text):
+            sent.append((chat_id, text))
+            return True, None, None
+
+        original_send = drain.send_telegram_message
+        drain.send_telegram_message = fake_send
+        try:
+            redis = FakeRedis()
+            await drain._process_one(
+                redis,
+                FakeHttp(),
+                self.settings(),
+                FakeLimiter(),
+                b"2-0",
+                {
+                    b"chat_id": b"641388037",
+                    b"event_kind": b"reply",
+                    b"idempotency_key": b"reply:456:2:1",
+                    b"message_text": b'[quote="real_user, post:1, topic:123"]quoted[/quote] answer',
+                },
+            )
+        finally:
+            drain.send_telegram_message = original_send
+
+        self.assertEqual(redis.acked, [("tg_notifications", "drain", b"2-0")])
+        self.assertNotIn("real_user", sent[0][1])
+        self.assertNotIn("[quote", sent[0][1])
+        self.assertNotIn("[/quote]", sent[0][1])
+        self.assertIn("quoted", sent[0][1])
+        self.assertIn("answer", sent[0][1])
+
 
 if __name__ == "__main__":
     unittest.main()

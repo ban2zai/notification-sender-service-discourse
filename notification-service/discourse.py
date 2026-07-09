@@ -4,6 +4,7 @@ import json
 import logging
 import re
 from html import unescape
+from html.parser import HTMLParser
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -13,6 +14,21 @@ if TYPE_CHECKING:
     import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
+
+_QUOTE_OPEN_RE = re.compile(r"\[quote(?:\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\]]*))?\s*\]", re.IGNORECASE)
+_QUOTE_CLOSE_RE = re.compile(r"\[/quote\s*\]", re.IGNORECASE)
+_HTML_TEXT_BREAK_TAGS = {
+    "aside",
+    "blockquote",
+    "br",
+    "div",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "tr",
+    "ul",
+}
 
 
 async def enrich_notification(
@@ -76,11 +92,19 @@ async def enrich_notification(
 
 
 def build_excerpt(post: dict[str, Any], max_chars: int) -> str:
-    text = post.get("raw") or _html_to_text(post.get("cooked") or "")
+    if post.get("raw"):
+        text = sanitize_quote_attribution(str(post.get("raw")))
+    else:
+        text = sanitize_quote_attribution(_cooked_to_text_without_quote_attribution(post.get("cooked") or ""))
     text = re.sub(r"\s+", " ", str(text)).strip()
     if len(text) <= max_chars:
         return text
     return text[: max_chars - 1].rstrip() + "…"
+
+
+def sanitize_quote_attribution(text: str) -> str:
+    text = _QUOTE_OPEN_RE.sub(" ", str(text))
+    return _QUOTE_CLOSE_RE.sub(" ", text)
 
 
 def _find_topic_post(topic: dict[str, Any], post_id: Any, post_number: Any) -> dict[str, Any]:
@@ -181,6 +205,58 @@ async def _get_cached_json(
     return data, False
 
 
-def _html_to_text(value: str) -> str:
-    without_tags = re.sub(r"<[^>]+>", " ", value)
-    return unescape(without_tags)
+def _cooked_to_text_without_quote_attribution(value: str) -> str:
+    parser = _CookedQuoteTextExtractor()
+    parser.feed(str(value or ""))
+    parser.close()
+    return unescape("".join(parser.parts))
+
+
+class _CookedQuoteTextExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self._quote_aside_depth = 0
+        self._aside_quote_stack: list[bool] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        tag = tag.lower()
+        if self._skip_depth:
+            self._skip_depth += 1
+            return
+
+        attr_map = {key.lower(): value or "" for key, value in attrs}
+        if tag == "aside":
+            is_quote_aside = _has_class(attr_map.get("class", ""), "quote")
+            self._aside_quote_stack.append(is_quote_aside)
+            if is_quote_aside:
+                self._quote_aside_depth += 1
+
+        if self._quote_aside_depth and tag == "div" and _has_class(attr_map.get("class", ""), "title"):
+            self._skip_depth = 1
+            return
+
+        if tag in _HTML_TEXT_BREAK_TAGS:
+            self.parts.append(" ")
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if self._skip_depth:
+            self._skip_depth -= 1
+            return
+
+        if tag == "aside" and self._aside_quote_stack:
+            if self._aside_quote_stack.pop():
+                self._quote_aside_depth = max(0, self._quote_aside_depth - 1)
+
+        if tag in _HTML_TEXT_BREAK_TAGS:
+            self.parts.append(" ")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip_depth:
+            self.parts.append(data)
+
+
+def _has_class(value: str, class_name: str) -> bool:
+    return class_name in {item.strip().lower() for item in value.split()}

@@ -149,6 +149,60 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("<b>[anonuser]</b>", message)
         self.assertNotIn("real_user", message)
 
+    def test_render_excerpt_removes_double_quoted_quote_author(self):
+        message, _ = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 2,
+                "user_id": 123,
+                "topic_id": 456,
+                "post_number": 2,
+                "data": {"topic_title": "Anon", "original_username": "real_user"},
+            },
+            "reply",
+            {
+                "topic": {"title": "Anon"},
+                "post": {"raw": '[quote="real_user, post:1, topic:123"]текст цитаты[/quote]ответ'},
+                "category": "",
+                "is_anonymous": True,
+                "actor_username": "anonuser",
+            },
+            400,
+        )
+
+        self.assertNotIn("real_user", message)
+        self.assertNotIn("[quote", message)
+        self.assertNotIn("[/quote]", message)
+        self.assertIn("текст цитаты", message)
+        self.assertIn("ответ", message)
+
+    def test_render_excerpt_removes_single_quoted_quote_author(self):
+        message, _ = render_notification_message(
+            "https://forum.example.ru",
+            {
+                "notification_type": 2,
+                "user_id": 123,
+                "topic_id": 456,
+                "post_number": 2,
+                "data": {"topic_title": "Anon", "original_username": "real_user"},
+            },
+            "reply",
+            {
+                "topic": {"title": "Anon"},
+                "post": {"raw": "[quote='real_user, post:1, topic:123']текст цитаты[/quote]ответ"},
+                "category": "",
+                "is_anonymous": True,
+                "actor_username": "anonuser",
+            },
+            400,
+        )
+
+        self.assertNotIn("real_user", message)
+        self.assertNotIn("[quote", message)
+        self.assertNotIn("[/quote]", message)
+        self.assertIn("текст цитаты", message)
+        self.assertIn("ответ", message)
+
     def test_render_actor_username_with_at_sign(self):
         message, _ = render_notification_message(
             "https://forum.example.ru",
@@ -313,6 +367,31 @@ class TemplateTests(unittest.TestCase):
     def test_excerpt_cleanup_and_truncation(self):
         self.assertEqual(build_excerpt({"raw": "a\n\n b\tc"}, 100), "a b c")
         self.assertEqual(build_excerpt({"raw": "123456789"}, 6), "12345…")
+
+    def test_excerpt_without_quote_stays_unchanged(self):
+        self.assertEqual(build_excerpt({"raw": "обычный текст без цитаты"}, 100), "обычный текст без цитаты")
+
+    def test_excerpt_truncates_after_quote_sanitization(self):
+        raw = '[quote="real_user, post:1, topic:123"]123456789[/quote]abcdef'
+
+        self.assertEqual(build_excerpt({"raw": raw}, 10), "123456789…")
+
+    def test_excerpt_removes_multiple_quote_headers(self):
+        raw = '[quote="first_user, post:1, topic:123"]первая[/quote] середина [quote=second_user]вторая[/quote]'
+
+        self.assertEqual(build_excerpt({"raw": raw}, 100), "первая середина вторая")
+
+    def test_excerpt_removes_cooked_quote_title_author(self):
+        cooked = (
+            '<aside class="quote" data-post="1" data-topic="123">'
+            '<div class="title"><div class="quote-controls"></div>'
+            '<a href="/u/real_user">real_user</a>:</div>'
+            "<blockquote><p>текст цитаты</p></blockquote>"
+            "</aside>"
+            "<p>ответ</p>"
+        )
+
+        self.assertEqual(build_excerpt({"cooked": cooked}, 100), "текст цитаты ответ")
 
 
 if __name__ == "__main__":
