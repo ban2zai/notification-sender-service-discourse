@@ -117,7 +117,7 @@ class DrainTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("real_user", sent[0][1])
         self.assertNotIn("[quote", sent[0][1])
         self.assertNotIn("[/quote]", sent[0][1])
-        self.assertIn("quoted", sent[0][1])
+        self.assertNotIn("quoted", sent[0][1])
         self.assertIn("answer", sent[0][1])
 
 

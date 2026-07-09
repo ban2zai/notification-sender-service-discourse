@@ -173,8 +173,8 @@ class TemplateTests(unittest.TestCase):
         self.assertNotIn("real_user", message)
         self.assertNotIn("[quote", message)
         self.assertNotIn("[/quote]", message)
-        self.assertIn("текст цитаты", message)
-        self.assertIn("ответ", message)
+        self.assertNotIn("текст цитаты", message)
+        self.assertIn("<blockquote>ответ</blockquote>", message)
 
     def test_render_excerpt_removes_single_quoted_quote_author(self):
         message, _ = render_notification_message(
@@ -200,8 +200,8 @@ class TemplateTests(unittest.TestCase):
         self.assertNotIn("real_user", message)
         self.assertNotIn("[quote", message)
         self.assertNotIn("[/quote]", message)
-        self.assertIn("текст цитаты", message)
-        self.assertIn("ответ", message)
+        self.assertNotIn("текст цитаты", message)
+        self.assertIn("<blockquote>ответ</blockquote>", message)
 
     def test_render_actor_username_with_at_sign(self):
         message, _ = render_notification_message(
@@ -374,12 +374,22 @@ class TemplateTests(unittest.TestCase):
     def test_excerpt_truncates_after_quote_sanitization(self):
         raw = '[quote="real_user, post:1, topic:123"]123456789[/quote]abcdef'
 
-        self.assertEqual(build_excerpt({"raw": raw}, 10), "123456789…")
+        self.assertEqual(build_excerpt({"raw": raw}, 4), "abc…")
 
     def test_excerpt_removes_multiple_quote_headers(self):
         raw = '[quote="first_user, post:1, topic:123"]первая[/quote] середина [quote=second_user]вторая[/quote]'
 
-        self.assertEqual(build_excerpt({"raw": raw}, 100), "первая середина вторая")
+        self.assertEqual(build_excerpt({"raw": raw}, 100), "середина")
+
+    def test_excerpt_removes_nested_quote_blocks(self):
+        raw = '[quote="first_user"]первая [quote="second_user"]вторая[/quote][/quote] ответ'
+
+        self.assertEqual(build_excerpt({"raw": raw}, 100), "ответ")
+
+    def test_excerpt_keeps_regular_mentions_and_profile_links_outside_quote(self):
+        raw = "Привет @real_user https://forum.example.ru/u/real_user/summary"
+
+        self.assertEqual(build_excerpt({"raw": raw}, 100), raw)
 
     def test_excerpt_removes_cooked_quote_title_author(self):
         cooked = (
@@ -391,7 +401,7 @@ class TemplateTests(unittest.TestCase):
             "<p>ответ</p>"
         )
 
-        self.assertEqual(build_excerpt({"cooked": cooked}, 100), "текст цитаты ответ")
+        self.assertEqual(build_excerpt({"cooked": cooked}, 100), "ответ")
 
 
 if __name__ == "__main__":

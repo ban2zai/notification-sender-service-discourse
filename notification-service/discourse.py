@@ -15,8 +15,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_QUOTE_OPEN_RE = re.compile(r"\[quote(?:\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\]]*))?\s*\]", re.IGNORECASE)
-_QUOTE_CLOSE_RE = re.compile(r"\[/quote\s*\]", re.IGNORECASE)
+_QUOTE_TAG_RE = re.compile(
+    r"\[quote(?:\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\]]*))?\s*\]|\[/quote\s*\]",
+    re.IGNORECASE,
+)
 _HTML_TEXT_BREAK_TAGS = {
     "aside",
     "blockquote",
@@ -93,18 +95,37 @@ async def enrich_notification(
 
 def build_excerpt(post: dict[str, Any], max_chars: int) -> str:
     if post.get("raw"):
-        text = sanitize_quote_attribution(str(post.get("raw")))
+        text = strip_quote_blocks(str(post.get("raw")))
     else:
-        text = sanitize_quote_attribution(_cooked_to_text_without_quote_attribution(post.get("cooked") or ""))
+        text = strip_quote_blocks(_cooked_to_text_without_quote_attribution(post.get("cooked") or ""))
     text = re.sub(r"\s+", " ", str(text)).strip()
     if len(text) <= max_chars:
         return text
     return text[: max_chars - 1].rstrip() + "…"
 
 
+def strip_quote_blocks(text: str) -> str:
+    parts: list[str] = []
+    position = 0
+    quote_depth = 0
+
+    for match in _QUOTE_TAG_RE.finditer(str(text)):
+        if quote_depth == 0:
+            parts.append(text[position : match.start()])
+        tag = match.group(0).lower()
+        if tag.startswith("[/quote"):
+            quote_depth = max(0, quote_depth - 1)
+        else:
+            quote_depth += 1
+        position = match.end()
+
+    if quote_depth == 0:
+        parts.append(str(text)[position:])
+    return "".join(parts)
+
+
 def sanitize_quote_attribution(text: str) -> str:
-    text = _QUOTE_OPEN_RE.sub(" ", str(text))
-    return _QUOTE_CLOSE_RE.sub(" ", text)
+    return strip_quote_blocks(text)
 
 
 def _find_topic_post(topic: dict[str, Any], post_id: Any, post_number: Any) -> dict[str, Any]:
@@ -231,6 +252,7 @@ class _CookedQuoteTextExtractor(HTMLParser):
             is_quote_aside = _has_class(attr_map.get("class", ""), "quote")
             self._aside_quote_stack.append(is_quote_aside)
             if is_quote_aside:
+                self.parts.append(" [quote] ")
                 self._quote_aside_depth += 1
 
         if self._quote_aside_depth and tag == "div" and _has_class(attr_map.get("class", ""), "title"):
@@ -249,6 +271,7 @@ class _CookedQuoteTextExtractor(HTMLParser):
         if tag == "aside" and self._aside_quote_stack:
             if self._aside_quote_stack.pop():
                 self._quote_aside_depth = max(0, self._quote_aside_depth - 1)
+                self.parts.append(" [/quote] ")
 
         if tag in _HTML_TEXT_BREAK_TAGS:
             self.parts.append(" ")
