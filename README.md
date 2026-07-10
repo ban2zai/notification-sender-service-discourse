@@ -85,7 +85,7 @@ Test mode uses `deploy/.env.notification.test` and points to the test Discourse 
 Expose it through Nginx Proxy Manager as:
 
 ```text
-tgsender-test.b2zn8n.ru -> notification-service-test:8067
+tgsender-test.example.ru -> notification-service-test:8067
 ```
 
 Production mode uses `deploy/.env.notification.prod` and must be created only after test mode is verified:
@@ -99,7 +99,7 @@ chmod 600 notification-sender-service-discourse-prod/deploy/.env.notification.pr
 Expose production through Nginx Proxy Manager as:
 
 ```text
-tgsender.b2zn8n.ru -> notification-service-prod:8067
+tgsender.example.ru -> notification-service-prod:8067
 ```
 
 Production deploy command:
